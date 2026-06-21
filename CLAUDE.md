@@ -2,91 +2,85 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## 프로젝트 규칙 (AutoTrading 30일 해커톤)
 
-AutoTrading is an automated trading system. This is an early-stage project currently in setup phase.
+### MVP 우선 원칙
+- **Day 1-28**: 필수 기능만 (백테스팅 → 자동거래 → 대시보드)
+- **Day 29-30**: 여유 있으면 추가 기능 (종목 분석) 고려
+- **기능 추가 금지**: 일정 압박 시 추가 요청 기능은 미루기
+
+### 위험 관리
+- **실금 투자**: 10만원 손실 가능 → 코드 버그 최소화
+- **키움 API**: 처음 사용 → 초반 학습곡선 높음
+- **타이트 일정**: 과도한 기능 추가 시 모든 것이 실패할 수 있음
 
 ## 언어 규칙
 
 - **코드**: 영어로 작성 (변수명, 함수명, 클래스명 등)
-- **나머지**: 한국어로 표현 (문서, 커밋 메시지, 이슈 설명, 주석 등)
+- **나머지**: 영어로 작성한 후 한국어로 번역한 내용 표시 (문서, 커밋 메시지, 이슈 설명, 주석 등)
 - **커밋메시지**: 커밋 메시지는 한국어로, 한 줄 요약 + 변경 이유
+# CLAUDE.md
 
-## Project Structure
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-The codebase is organized as follows (evolving):
-- `src/` - Main application code
-- `tests/` - Test suite
-- `config/` - Configuration files (API keys, trading parameters, etc.)
-- `docs/` - Project documentation
-- `scripts/` - Utility scripts for setup, migration, etc.
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-## Development Commands
+## 1. Think Before Coding
 
-These commands will be available as the project develops:
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-```bash
-# Setup
-npm install          # Install dependencies (if Node.js based)
-python -m venv venv  # Create virtual environment (if Python based)
-source venv/bin/activate
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
 
-# Development
-npm run dev          # Start development server
-npm run lint         # Run linter
-npm run test         # Run test suite
-npm run test -- path/to/test.spec.js  # Run single test
+## 2. Simplicity First
 
-# Production
-npm run build        # Build for production
-npm start            # Start application
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
 ```
 
-(Commands will be updated as the tech stack is finalized.)
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-## Key Architecture Patterns
+---
 
-As this project develops, follow these patterns:
-
-1. **Configuration Management**: Keep sensitive data (API keys, credentials) in environment variables or `.env` files (never committed). Use configuration modules to centralize settings.
-
-2. **API Integration**: Separate API clients and trading logic. Create dedicated modules for exchange APIs and internal service communication.
-
-3. **Data Handling**: Trading data is time-sensitive. Use appropriate data structures and consider caching strategies where applicable.
-
-4. **Error Handling**: Trading systems require robust error handling. Log failures comprehensively for debugging and auditing.
-
-5. **Testing Strategy**: 
-   - Unit tests for trading logic and calculations
-   - Integration tests for API interactions (use mocks for external services in CI)
-   - End-to-end tests for critical trading flows
-
-6. **Documentation**: Each module should have a brief comment explaining its responsibility. Document any non-obvious trading logic or calculations.
-
-## Tech Stack Considerations
-
-- **Backend**: Node.js (Express/Fastify) or Python (FastAPI/Django) - choose based on team expertise
-- **Database**: Consider PostgreSQL for transaction safety in financial systems
-- **Message Queue**: Redis or similar for async tasks and event processing
-- **Monitoring**: Structured logging and metrics collection for trading operations
-
-## Important Guidelines
-
-- **Never hardcode secrets**: Use environment variables for all credentials
-- **Validate all inputs**: Especially important for trading parameters and market data
-- **Version your APIs**: Maintain backwards compatibility when possible
-- **Keep trading logic isolated**: Separate business logic from infrastructure concerns
-- **Audit trail**: Log all significant actions for compliance and debugging
-
-## Git Workflow
-
-- Use descriptive commit messages
-- Reference issues/tickets in commit messages when applicable
-- Protect main branch with required reviews before merge
-
-## Future Improvements
-
-- Add CI/CD pipeline for automated testing and deployment
-- Implement proper logging and monitoring infrastructure
-- Set up documentation site (e.g., with MkDocs or Docusaurus)
-- Create development guidelines document as conventions solidify
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
