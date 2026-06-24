@@ -6,6 +6,9 @@ import { api } from '../api/client.js'
 const { data, error, loading, load } = useAsyncData(() => api.financial())
 onMounted(load)
 
+// 기준일(as_of)이 없으면 신뢰할 수 없는 데이터로 보고 표시하지 않는다.
+const hasAsOf = computed(() => !!data.value?.as_of)
+
 const verdictClass = computed(() => {
   const v = data.value?.verdict
   return 'verdict-' + (v === '저평가' ? 'undervalued' : v === '고평가' ? 'overvalued' : 'neutral')
@@ -41,6 +44,9 @@ const verdictBasis = computed(() => {
     <h2>💰 재무 분석 (이슈 002)</h2>
     <div v-if="error" class="error">재무 분석 로드 실패: {{ error }}</div>
     <div v-else-if="loading || !data" class="loading">분석 중...</div>
+    <div v-else-if="!hasAsOf" class="error">
+      기준일 정보가 없어 신뢰할 수 없는 데이터입니다. 표시하지 않습니다.
+    </div>
     <div v-else style="margin-top: 15px;">
       <div style="margin-bottom: 20px;">
         <strong style="font-size: 18px;">판정 결과</strong>

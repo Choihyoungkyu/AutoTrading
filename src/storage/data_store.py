@@ -76,4 +76,11 @@ class DataStore:
                 "SELECT data FROM financial_cache WHERE code=? AND date=?",
                 (code, str(date.today()))
             ).fetchone()
+            if row is None:
+                # 오늘자 캐시가 없으면 가장 최근 캐시로 폴백(시드 데이터 유지).
+                # 실시간 재무 소스가 비어도 재무 카드가 깨지지 않도록 한다.
+                row = conn.execute(
+                    "SELECT data FROM financial_cache WHERE code=? ORDER BY date DESC LIMIT 1",
+                    (code,)
+                ).fetchone()
         return json.loads(row[0]) if row else None

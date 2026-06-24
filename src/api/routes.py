@@ -107,19 +107,32 @@ def stock_us(symbol):
         return jsonify({"error": str(e)}), 500
 
 
+def _ensure_as_of(code, data):
+    # 재무 데이터에 기준일이 없으면 최신 거래일(OHLCV)로 채운다.
+    # 프론트는 as_of가 없으면 신뢰 불가로 보고 데이터를 숨기므로, 항상 채워준다.
+    if data and not data.get("as_of"):
+        try:
+            df = krx.get_ohlcv(code)
+            if not df.empty:
+                data["as_of"] = str(df["date"].iloc[-1])[:10]
+        except Exception:
+            pass
+    return data
+
+
 @api_bp.route("/analyze/<code>/financial")
 def analyze_financial(code):
     try:
         cached = store.load_financial(code)
         if cached:
-            return jsonify(cached)
+            return jsonify(_ensure_as_of(code, cached))
 
         result = financial_analyzer.analyze(code)
         if not result:
             return jsonify({"error": "No data found for code: " + code}), 404
 
         store.save_financial(code, result)
-        return jsonify(result)
+        return jsonify(_ensure_as_of(code, result))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
