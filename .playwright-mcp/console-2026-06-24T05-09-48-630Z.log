@@ -1,0 +1,22 @@
+[     339ms] [LOG] JQMIGRATE: Migrate is installed, version 1.4.1 @ https://lab.nonghyup.com/Web-home/js/jquery-migrate-1.4.1.min.js:1
+[     625ms] [LOG] exist ul.cmmnLink @ https://lab.nonghyup.com/Web-home/js/common.js:12
+[     633ms] TypeError: $(...).fullpage is not a function
+    at createFullpage (https://lab.nonghyup.com/sites/lab/style/js/main.js?version=1:940:33)
+    at HTMLDocument.<anonymous> (https://lab.nonghyup.com/sites/lab/style/js/main.js?version=1:935:7)
+    at c (https://lab.nonghyup.com/Web-home/js/jquery-1.9.1.min.js:3:7857)
+    at Object.fireWith [as resolveWith] (https://lab.nonghyup.com/Web-home/js/jquery-1.9.1.min.js:3:8658)
+    at b.ready (https://lab.nonghyup.com/Web-home/js/jquery-1.9.1.min.js:3:3266)
+    at HTMLDocument.H (https://lab.nonghyup.com/Web-home/js/jquery-1.9.1.min.js:3:695)
+[    7014ms] [LOG] JQMIGRATE: Migrate is installed, version 1.4.1 @ https://lab.nonghyup.com/Web-home/js/jquery-migrate-1.4.1.min.js:1
+[    7125ms] [LOG] exist ul.cmmnLink @ https://lab.nonghyup.com/Web-home/js/common.js:12
+[    7129ms] TypeError: $(...).fullpage is not a function
+    at createFullpage (https://lab.nonghyup.com/sites/lab/style/js/main.js?version=1:940:33)
+    at HTMLDocument.<anonymous> (https://lab.nonghyup.com/sites/lab/style/js/main.js?version=1:935:7)
+    at c (https://lab.nonghyup.com/Web-home/js/jquery-1.9.1.min.js:3:7857)
+    at Object.fireWith [as resolveWith] (https://lab.nonghyup.com/Web-home/js/jquery-1.9.1.min.js:3:8658)
+    at b.ready (https://lab.nonghyup.com/Web-home/js/jquery-1.9.1.min.js:3:3266)
+    at HTMLDocument.H (https://lab.nonghyup.com/Web-home/js/jquery-1.9.1.min.js:3:695)
+[   12952ms] [LOG] JQMIGRATE: Migrate is installed, version 1.4.1 @ https://lab.nonghyup.com/Web-home/js/jquery-migrate-1.4.1.min.js:1
+[   12996ms] [LOG] exist ul.cmmnLink @ https://lab.nonghyup.com/Web-home/js/common.js:12
+[   13069ms] [LOG] 개인정보 체크 : true @ https://lab.nonghyup.com/Web-home/fnct/globalNavi/JW_Gnv_sBlue/js/view.js:39
+[   13143ms] [LOG] 비번변경 체크 : true @ https://lab.nonghyup.com/Web-home/fnct/globalNavi/JW_Gnv_sBlue/js/view.js:117
