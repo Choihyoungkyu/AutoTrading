@@ -1,0 +1,54 @@
+import sqlite3
+import pandas as pd
+from pathlib import Path
+
+DB_PATH = Path("data/stock_data.db")
+
+
+class DataStore:
+    def __init__(self, db_path: Path = DB_PATH):
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = db_path
+
+    def _connect(self):
+        return sqlite3.connect(str(self.db_path))
+
+    def ping(self) -> bool:
+        try:
+            with self._connect() as conn:
+                conn.execute("SELECT 1")
+            return True
+        except Exception:
+            return False
+
+    def save(self, df: pd.DataFrame, table: str) -> int:
+        if df.empty:
+            return 0
+        with self._connect() as conn:
+            df.to_sql(table, conn, if_exists="append", index=False)
+        return len(df)
+
+    def load(self, table: str, code: str = None,
+             start: str = None, end: str = None) -> pd.DataFrame:
+        with self._connect() as conn:
+            query = f"SELECT * FROM {table}"
+            conditions = []
+            params = []
+            if code:
+                conditions.append("code = ?")
+                params.append(code)
+            if start:
+                conditions.append("date >= ?")
+                params.append(start)
+            if end:
+                conditions.append("date <= ?")
+                params.append(end)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+            query += " ORDER BY date"
+            return pd.read_sql_query(query, conn, params=params)
+
+    def export_csv(self, table: str, path: str) -> str:
+        df = self.load(table)
+        df.to_csv(path, index=False, encoding="utf-8-sig")
+        return path

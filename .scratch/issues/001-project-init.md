@@ -12,12 +12,12 @@
 
 ## Acceptance criteria
 
-- [ ] Python 프로젝트 초기화 (requirements.txt, .gitignore, 폴더 구조)
-- [ ] PYKRX 라이브러리로 삼성전자(005930) 시세 데이터 조회 테스트 완료
-- [ ] yfinance 라이브러리로 AAPL, TSLA 시세 데이터 조회 테스트 완료
-- [ ] SQLite 또는 CSV로 데이터 저장 및 로드 기능 구현
-- [ ] Flask 또는 FastAPI 기본 서버 구동 (`python main.py` → http://localhost:5000)
-- [ ] 데이터 수집 모듈 테스트 (고정 종목으로 데이터 수집 가능 확인)
+- [x] Python 프로젝트 초기화 (requirements.txt, .gitignore, 폴더 구조)
+- [x] PYKRX 라이브러리로 삼성전자(005930) 시세 데이터 조회 테스트 완료
+- [x] yfinance 라이브러리로 AAPL, TSLA 시세 데이터 조회 테스트 완료
+- [x] SQLite 또는 CSV로 데이터 저장 및 로드 기능 구현
+- [x] Flask 또는 FastAPI 기본 서버 구동 (`python main.py` → http://localhost:5000)
+- [x] 데이터 수집 모듈 테스트 (고정 종목으로 데이터 수집 가능 확인)
 
 ## Blocked by
 
