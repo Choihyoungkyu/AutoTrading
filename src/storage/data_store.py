@@ -1,5 +1,7 @@
 import sqlite3
+import json
 import pandas as pd
+from datetime import date
 from pathlib import Path
 
 DB_PATH = Path("data/stock_data.db")
@@ -52,3 +54,26 @@ class DataStore:
         df = self.load(table)
         df.to_csv(path, index=False, encoding="utf-8-sig")
         return path
+
+    def _ensure_financial_table(self, conn):
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS financial_cache "
+            "(code TEXT, date TEXT, data TEXT, PRIMARY KEY (code, date))"
+        )
+
+    def save_financial(self, code: str, data: dict) -> None:
+        with self._connect() as conn:
+            self._ensure_financial_table(conn)
+            conn.execute(
+                "INSERT OR REPLACE INTO financial_cache VALUES (?, ?, ?)",
+                (code, str(date.today()), json.dumps(data))
+            )
+
+    def load_financial(self, code: str) -> dict | None:
+        with self._connect() as conn:
+            self._ensure_financial_table(conn)
+            row = conn.execute(
+                "SELECT data FROM financial_cache WHERE code=? AND date=?",
+                (code, str(date.today()))
+            ).fetchone()
+        return json.loads(row[0]) if row else None

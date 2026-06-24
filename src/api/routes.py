@@ -382,7 +382,7 @@ HTML_TEMPLATE = """
         loadPriceChart('1m');
 
         // DB 상태 확인
-        fetch('/health')
+        fetch('/api/health')
             .then(r => r.json())
             .then(data => {
                 const statusElement = document.getElementById('db-text');
@@ -746,9 +746,15 @@ def stock_us(symbol):
 @api_bp.route("/analyze/<code>/financial")
 def analyze_financial(code):
     try:
+        cached = store.load_financial(code)
+        if cached:
+            return jsonify(cached)
+
         result = financial_analyzer.analyze(code)
         if not result:
             return jsonify({"error": "No data found for code: " + code}), 404
+
+        store.save_financial(code, result)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
