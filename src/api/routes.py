@@ -610,13 +610,18 @@ def stock_kr_price_history(code):
         bb_std = df['close'].rolling(20).std()
         df['bb_upper'] = (df['ma20'] + 2 * bb_std).round(0)
         df['bb_lower'] = (df['ma20'] - 2 * bb_std).round(0)
-        df = df.where(pd.notna(df), other=None)
+
+        data = df.to_dict(orient="records")
+        for row in data:
+            for key in row:
+                if pd.isna(row[key]):
+                    row[key] = None
 
         return jsonify({
             "code": code,
             "period": period,
             "count": len(df),
-            "data": df.to_dict(orient="records")
+            "data": data
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
