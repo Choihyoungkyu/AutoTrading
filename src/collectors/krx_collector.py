@@ -34,4 +34,5 @@ class KRXCollector:
             "pbr": float(row.get("PBR", 0)),
             "dividend_yield": float(row.get("DIV", 0)),
             "eps": float(row.get("EPS", 0)),
+            "bps": float(row.get("BPS", 0)),
         }

@@ -22,12 +22,12 @@ GET /analyze/005930/financial
 
 ## Acceptance criteria
 
-- [ ] PYKRX에서 삼성전자 재무 데이터 수집 (최근 분기 기준)
-- [ ] PER, PBR, ROE, EPS, 부채비율, 배당수익률 계산
-- [ ] 동종업계(반도체) 평균 데이터 수집 및 비교
-- [ ] `/analyze/005930/financial` 엔드포인트 구현
-- [ ] 저평가/고평가 판정 로직 구현
-- [ ] 고정 재무 데이터로 단위 테스트 작성 (mock)
+- [x] PYKRX에서 삼성전자 재무 데이터 수집 (최근 분기 기준)
+- [x] PER, PBR, ROE, EPS, 부채비율, 배당수익률 계산
+- [x] 동종업계(반도체) 평균 데이터 수집 및 비교
+- [x] `/analyze/005930/financial` 엔드포인트 구현
+- [x] 저평가/고평가 판정 로직 구현
+- [x] 고정 재무 데이터로 단위 테스트 작성 (mock)
 
 ## Blocked by
 

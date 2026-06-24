@@ -2,11 +2,13 @@ from flask import Blueprint, jsonify, request, render_template_string
 from src.collectors.krx_collector import KRXCollector
 from src.collectors.yfinance_collector import YFinanceCollector
 from src.storage.data_store import DataStore
+from src.analyzers.financial_analyzer import FinancialAnalyzer
 
 api_bp = Blueprint("api", __name__)
 krx = KRXCollector()
 yf = YFinanceCollector()
 store = DataStore()
+financial_analyzer = FinancialAnalyzer(krx, yf)
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -214,5 +216,16 @@ def stock_us(symbol):
             "count": len(df),
             "data": df.tail(5).to_dict(orient="records")
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/analyze/<code>/financial")
+def analyze_financial(code):
+    try:
+        result = financial_analyzer.analyze(code)
+        if not result:
+            return jsonify({"error": "No data found for code: " + code}), 404
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
