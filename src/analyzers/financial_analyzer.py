@@ -35,6 +35,7 @@ class FinancialAnalyzer:
             "roe": roe,
             "dividend_yield": metrics.get("dividend_yield", 0),
             "debt_ratio": debt_ratio,
+            "as_of": metrics.get("as_of"),
         }
 
     def get_industry_average(self, peer_codes: list = None) -> dict:
@@ -92,6 +93,7 @@ class FinancialAnalyzer:
 
         return {
             "code": code,
+            "as_of": metrics.get("as_of"),
             "per": round(metrics["per"], 2),
             "pbr": round(metrics["pbr"], 2),
             "roe": round(metrics["roe"], 2),

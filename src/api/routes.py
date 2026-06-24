@@ -192,6 +192,7 @@ HTML_TEMPLATE = """
                 <button class="ind-btn" id="ind-ma60" style="border-color:#2980b9;color:#2980b9" data-tooltip="최근 60일 평균가격. 중기 추세의 흐름을 나타냄" onclick="toggleIndicator('ma60')">MA60</button>
                 <button class="ind-btn" id="ind-bb" style="border-color:#9b59b6;color:#9b59b6" data-tooltip="이동평균을 중심으로 표준편차 범위의 밴드. 가격 변동성과 과매수/과매도를 나타냄" onclick="toggleIndicator('bb')">볼린저밴드</button>
             </div>
+            <div id="price-chart-asof" style="font-size:12px;color:#7f8c8d;margin-top:8px;"></div>
             <div class="price-chart-wrap">
                 <canvas id="priceChart"></canvas>
             </div>
@@ -246,6 +247,9 @@ HTML_TEMPLATE = """
         function renderPriceChart(data) {
             const labels = data.data.map(d => d.date);
             const closes = data.data.map(d => d.close);
+
+            const asofEl = document.getElementById('price-chart-asof');
+            if (asofEl) asofEl.textContent = data.data.length ? ('기준일: ' + data.data[data.data.length - 1].date) : '';
 
             const datasets = [{
                 label: '종가',
@@ -422,6 +426,7 @@ HTML_TEMPLATE = """
                         <div><strong>현재가:</strong> <span style="font-size: 24px; font-weight: bold;">${latest.close.toLocaleString()}</span> ₩</div>
                         <div><strong>변화율:</strong> <span class="${changeClass}" style="font-size: 18px;">${changeText}</span></div>
                         <div><strong>거래량:</strong> ${(latest.volume / 1000000).toFixed(1)}M</div>
+                        <div><strong>기준일:</strong> ${latest.date}</div>
                         <div><strong>조회:</strong> ${data.count}개 날짜 데이터</div>
                     </div>
                 `;
@@ -473,6 +478,7 @@ HTML_TEMPLATE = """
                             <div class="verdict-badge ${verdictClass}" style="font-size: 16px;">
                                 ${data.verdict}
                             </div>
+                            <div style="font-size: 12px; color: #7f8c8d; margin-top: 6px;">기준일: ${data.as_of || '-'}</div>
                         </div>
 
                         <div class="metrics-grid">
@@ -552,6 +558,7 @@ HTML_TEMPLATE = """
                             <div style="display: inline-block; background: ${signalColor}; color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; margin-top: 10px; font-size: 16px;">
                                 ${signalKo} (신뢰도: ${(data.confidence * 100).toFixed(0)}%)
                             </div>
+                            <div style="font-size: 12px; color: #7f8c8d; margin-top: 6px;">기준일: ${data.as_of || '-'}</div>
                         </div>
 
                         <div class="metrics-grid">

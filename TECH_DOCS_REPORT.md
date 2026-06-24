@@ -107,6 +107,7 @@ df = stock.get_market_ohlcv("20230101", "20231231", "005930")  # 삼성전자
 # PER, PBR, EPS, ROE 등
 finance = stock.get_market_fundamental("20231231", market="KOSPI")
 ```
+> ⚠️ **실제 구현 주의**: 본 프로젝트는 재무 지표에 `get_market_fundamental`을 사용하며, KRX 로그인이 필요하다(`.env`의 `KRX_ID`/`KRX_PW`). 부채비율은 KRX 미제공이라 yfinance로 보완한다. 경위는 `docs/adr/0005-재무지표-pykrx-복귀-krx로그인.md`(이전 검토 ADR 0004) 참조.
 
 **지수 데이터**:
 ```python
@@ -579,6 +580,7 @@ async def root():
 async def health():
     return {"status": "ok"}
 ```
+> ⚠️ **실제 구현 주의**: 위는 FastAPI 예시이며, 본 프로젝트는 Flask로 구현되었고 health 라우트는 `/api/health`이다.
 
 #### 분석 API 예시
 ```python

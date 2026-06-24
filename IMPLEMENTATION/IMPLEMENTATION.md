@@ -17,7 +17,8 @@
 - `get_ohlcv(code, start, end)`: PYKRX 시세 데이터 조회
   - 삼성전자(005930) 테스트 완료: 21개 행 조회 성공
   - 컬럼: date, open, high, low, close, volume, change, code
-- `get_market_cap(code, date)`: 재무 지표 (PER, PBR, DIV, EPS) - 이슈 002에서 재사용
+- `get_market_cap(code, date)`: 재무 지표 (PER, PBR, EPS, BPS, 배당수익률) + 기준 거래일(`as_of`) - 이슈 002에서 재사용
+  - 출처: **PYKRX `get_market_fundamental`** (KRX 로그인 필요 — `.env`의 `KRX_ID`/`KRX_PW`). 경위는 `docs/adr/0005-재무지표-pykrx-복귀-krx로그인.md` 참조. 부채비율은 KRX 미제공이라 `FinancialAnalyzer`에서 yfinance로 보완
 
 #### YFinanceCollector (`src/collectors/yfinance_collector.py`)
 - `get_ohlcv(symbol, period)`: yfinance 시세 데이터 (재시도 로직 포함)
@@ -33,6 +34,7 @@ SQLite 기반 구현:
 - `save(df, table)`: DataFrame을 SQLite 테이블에 저장 ✓
 - `load(table, code, start, end)`: 조건부 데이터 로드 ✓
 - `export_csv(table, path)`: CSV 내보내기
+- `save_financial(code, data)` / `load_financial(code)`: 재무 분석 결과 일일 캐싱 (`financial_cache` 테이블, (code, date) 키) — 이슈 002 엔드포인트에서 사용
 
 **검증 결과**:
 - 데이터베이스 생성: `data/stock_data.db` 자동 생성 ✓
@@ -43,7 +45,7 @@ SQLite 기반 구현:
 
 구현된 엔드포인트:
 - `GET /` → 서비스 정보 및 상태 ✓
-- `GET /health` → SQLite 연결 확인 포함 ✓
+- `GET /api/health` → SQLite 연결 확인 포함 ✓
 - `GET /api/stock/kr/<code>` → PYKRX 국내 주식 시세 ✓
 - `GET /api/stock/us/<symbol>` → yfinance 해외 주식 시세
 
@@ -147,6 +149,11 @@ source venv/bin/activate
 # 의존성 설치
 pip install -r requirements.txt
 
+# KRX 로그인 자격증명 설정 (재무 지표 조회에 필요) — 저장소 루트 .env
+#   KRX_ID=<data.krx.co.kr 아이디>
+#   KRX_PW=<비밀번호>
+# (.env는 .gitignore로 커밋되지 않음. pykrx가 import 시 자동 로그인)
+
 # PYKRX 테스트
 pytest tests/test_krx.py -v
 
@@ -160,7 +167,7 @@ python3 -c "from src.storage.data_store import DataStore; print(DataStore().ping
 python3 main.py
 
 # API 테스트 (별도 터미널)
-curl http://localhost:5000/health
+curl http://localhost:5000/api/health
 curl http://localhost:5000/api/stock/kr/005930
 ```
 

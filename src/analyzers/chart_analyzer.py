@@ -21,8 +21,11 @@ class ChartAnalyzer:
         indicators = self._calculate_indicators(df)
         signal, confidence = self._determine_signal(indicators)
 
+        as_of = str(df["date"].iloc[-1]) if "date" in df.columns else str(df.index[-1])
+
         return {
             "code": code,
+            "as_of": as_of,
             "ma_20": round(indicators["ma_20"], 2),
             "ma_50": round(indicators["ma_50"], 2),
             "rsi": round(indicators["rsi"], 2),

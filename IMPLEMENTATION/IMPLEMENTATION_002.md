@@ -10,6 +10,11 @@
 
 이슈 002는 `/analyze/<code>/financial` 엔드포인트를 추가하여 특정 종목의 재무 지표를 업계 평균과 비교하고 저평가/고평가를 판정하는 기능을 구현했습니다.
 
+> **후속 변경 경위**:
+> 1. KRX 재무 엔드포인트가 로그인을 요구해 한때 **네이버 금융 스크래핑**으로 전환(ADR 0004).
+> 2. 이후 KRX 로그인 자격증명을 확보하여 **PYKRX `get_market_fundamental`로 복귀**(ADR 0005). `KRX_ID`/`KRX_PW`를 `.env`에 두고 pykrx import 전에 `load_dotenv()`로 로드. 추정 PER은 KRX 미제공이라 제거, 부채비율은 yfinance로 보완.
+> 3. 재무 분석 결과 **일일 캐싱** 추가(커밋 `65d4800`) — `src/storage/data_store.py`(`save_financial`/`load_financial`), `src/api/routes.py`(엔드포인트 캐시 read-through).
+
 ---
 
 ## 수정/생성 파일
@@ -45,7 +50,7 @@
 - `/analyze/<code>/financial` 엔드포인트 추가
   ```
   GET /analyze/005930/financial
-  → {
+  → {   // 아래는 형식 설명용 예시 값 (실제 값 아님)
       "code": "005930",
       "per": 8.5,
       "pbr": 1.2,
@@ -90,7 +95,7 @@ tests/test_financial.py::test_analyze_endpoint PASSED           [100%]
 
 ## Acceptance Criteria 체크리스트
 
-- [x] PYKRX에서 삼성전자 재무 데이터 수집 (최근 분기 기준)
+- [x] PYKRX에서 삼성전자 재무 데이터 수집 (KRX 로그인 필요, ADR 0005)
 - [x] PER, PBR, ROE, EPS, 부채비율, 배당수익률 계산
 - [x] 동종업계(반도체) 평균 데이터 수집 및 비교
 - [x] `/analyze/005930/financial` 엔드포인트 구현
@@ -135,8 +140,8 @@ BPS > 0 조건으로 제로 디바이전 방지.
 ## 알려진 한계
 
 1. **부채비율**: yfinance `.KS` ticker의 debtToEquity 필드가 항상 제공되지 않음
-2. **실시간 동기화**: 업계 평균은 호출 시점에 계산 (캐싱 없음)
-3. **재무 주기**: pykrx는 최근 분기 데이터만 제공, 분기 발표 이후 ~2주 지연
+2. **캐싱**: 재무 분석 결과는 종목별 1일 단위로 캐싱됨(`financial_cache`, 후속 변경). 같은 날 재호출 시 캐시 반환되어 분석 로직 변경이 즉시 반영되지 않을 수 있음
+3. **재무 기준**: PYKRX는 `date` 인자로 시점별 조회 가능(미지정 시 최근 영업일). 단 KRX는 **별도재무 기준**이라 EPS/BPS/PER이 연결 기준(삼성증권·네이버)과 다름. 부채비율은 KRX 미제공으로 yfinance `debtToEquity`(D/E, 표준 부채비율과 다름) 사용
 4. **peer 확대 불가**: SEMICONDUCTOR_PEERS는 하드코딩 (향후 이슈 009에서 다중 업계 지원 시 parametrize)
 
 ---
