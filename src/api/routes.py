@@ -474,9 +474,9 @@ HTML_TEMPLATE = """
                 const perAvg = data.industry_avg.per, pbrAvg = data.industry_avg.pbr;
                 const perLow = data.per < perAvg, pbrLow = data.pbr < pbrAvg;
                 const verdictBasis =
-                    '판정 규칙: PER·PBR이 모두 업계평균보다 낮으면 저평가, 모두 높으면 고평가, 그 외 중립\n\n'
-                    + 'PER ' + data.per + ' vs 업계 ' + perAvg.toFixed(1) + ' → ' + (perLow ? '낮음(저평가 신호)' : '높음(고평가 신호)') + '\n'
-                    + 'PBR ' + data.pbr + ' vs 업계 ' + pbrAvg.toFixed(2) + ' → ' + (pbrLow ? '낮음(저평가 신호)' : '높음(고평가 신호)') + '\n\n'
+                    '판정 규칙: PER·PBR이 모두 업계평균보다 낮으면 저평가, 모두 높으면 고평가, 그 외 중립\\n\\n'
+                    + 'PER ' + data.per + ' vs 업계 ' + perAvg.toFixed(1) + ' → ' + (perLow ? '낮음(저평가 신호)' : '높음(고평가 신호)') + '\\n'
+                    + 'PBR ' + data.pbr + ' vs 업계 ' + pbrAvg.toFixed(2) + ' → ' + (pbrLow ? '낮음(저평가 신호)' : '높음(고평가 신호)') + '\\n\\n'
                     + '→ 종합 판정: ' + data.verdict;
 
                 document.getElementById('financial-analysis').innerHTML = `
