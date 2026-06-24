@@ -7,6 +7,8 @@
 
 | 파일 | 이슈 | 내용 |
 |---|---|---|
+| [IMPLEMENTATION.md](./IMPLEMENTATION.md) | #001 | 프로젝트 초기화 — 데이터 수집(PYKRX/yfinance)·SQLite 저장소·Flask API |
+| [IMPLEMENTATION_002.md](./IMPLEMENTATION_002.md) | #002 | 재무 분석 API — PER/PBR/ROE 등 + 업계 비교·저평가/고평가 판정 |
 | [003-samsung-chart.md](./003-samsung-chart.md) | #003 | 기술적 분석 API (MA, RSI, MACD, 볼린저밴드, Buy/Sell 신호) |
 | [011-price-chart.md](./011-price-chart.md) | #011 | 주가 차트 UI — 일/주/달/년 기간 선택 + Chart.js 시각화 |
 

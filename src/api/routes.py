@@ -471,10 +471,18 @@ HTML_TEMPLATE = """
                 const perStatus = data.per < data.industry_avg.per ? '✓ 저평가' : '✗ 고평가';
                 const pbrStatus = data.pbr < data.industry_avg.pbr ? '✓ 저평가' : '✗ 고평가';
 
+                const perAvg = data.industry_avg.per, pbrAvg = data.industry_avg.pbr;
+                const perLow = data.per < perAvg, pbrLow = data.pbr < pbrAvg;
+                const verdictBasis =
+                    '판정 규칙: PER·PBR이 모두 업계평균보다 낮으면 저평가, 모두 높으면 고평가, 그 외 중립\n\n'
+                    + 'PER ' + data.per + ' vs 업계 ' + perAvg.toFixed(1) + ' → ' + (perLow ? '낮음(저평가 신호)' : '높음(고평가 신호)') + '\n'
+                    + 'PBR ' + data.pbr + ' vs 업계 ' + pbrAvg.toFixed(2) + ' → ' + (pbrLow ? '낮음(저평가 신호)' : '높음(고평가 신호)') + '\n\n'
+                    + '→ 종합 판정: ' + data.verdict;
+
                 document.getElementById('financial-analysis').innerHTML = `
                     <div style="margin-top: 15px;">
                         <div style="margin-bottom: 20px;">
-                            <strong style="font-size: 18px;">판정 결과</strong>
+                            <strong style="font-size: 18px;">판정 결과</strong><span class="tooltip-icon" data-tooltip="${verdictBasis}">?</span>
                             <div class="verdict-badge ${verdictClass}" style="font-size: 16px;">
                                 ${data.verdict}
                             </div>
