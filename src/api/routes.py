@@ -1,4 +1,6 @@
 from flask import Blueprint, jsonify, request, render_template_string
+from datetime import datetime, timedelta
+import pandas as pd
 from src.collectors.krx_collector import KRXCollector
 from src.collectors.yfinance_collector import YFinanceCollector
 from src.storage.data_store import DataStore
@@ -19,6 +21,7 @@ HTML_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>주식 분석 시스템</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
@@ -55,6 +58,14 @@ HTML_TEMPLATE = """
         .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; }
         .comparison-card { background: #f8f9fa; padding: 15px; border-radius: 6px; }
         .comparison-title { font-weight: 600; color: #2c3e50; margin-bottom: 10px; }
+        .period-buttons { display: flex; gap: 8px; margin-bottom: 16px; }
+        .period-btn { padding: 6px 18px; border: 1px solid #dee2e6; border-radius: 20px; background: white; cursor: pointer; font-size: 14px; color: #495057; transition: all 0.15s; }
+        .period-btn:hover { background: #e9ecef; }
+        .period-btn.active { background: #2c3e50; color: white; border-color: #2c3e50; }
+        .indicator-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .ind-btn { padding: 4px 14px; border-radius: 20px; border: 2px solid; background: white; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s; }
+        .ind-btn.active { color: white !important; }
+        .price-chart-wrap { position: relative; height: 320px; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -107,6 +118,26 @@ HTML_TEMPLATE = """
         </div>
 
         <div class="card">
+            <h2>📉 주가 차트 (삼성전자 005930)</h2>
+            <div class="period-buttons">
+                <button class="period-btn" data-period="1d" onclick="loadPriceChart('1d')">일</button>
+                <button class="period-btn" data-period="1w" onclick="loadPriceChart('1w')">주</button>
+                <button class="period-btn active" data-period="1m" onclick="loadPriceChart('1m')">달</button>
+                <button class="period-btn" data-period="1y" onclick="loadPriceChart('1y')">년</button>
+            </div>
+            <div class="indicator-filters">
+                <button class="ind-btn" id="ind-ma5"  style="border-color:#e74c3c;color:#e74c3c"  onclick="toggleIndicator('ma5')">MA5</button>
+                <button class="ind-btn active" id="ind-ma20" style="border-color:#f39c12;background:#f39c12;color:white" onclick="toggleIndicator('ma20')">MA20</button>
+                <button class="ind-btn" id="ind-ma60" style="border-color:#2980b9;color:#2980b9"  onclick="toggleIndicator('ma60')">MA60</button>
+                <button class="ind-btn" id="ind-bb"   style="border-color:#9b59b6;color:#9b59b6"  onclick="toggleIndicator('bb')">볼린저밴드</button>
+            </div>
+            <div class="price-chart-wrap">
+                <canvas id="priceChart"></canvas>
+            </div>
+            <div id="price-chart-error"></div>
+        </div>
+
+        <div class="card">
             <h2>💰 재무 분석 (이슈 002)</h2>
             <div id="financial-analysis" class="loading">분석 중...</div>
         </div>
@@ -125,6 +156,166 @@ HTML_TEMPLATE = """
     </div>
 
     <script>
+        // 주가 차트
+        let priceChartInstance = null;
+        let priceChartData = null;
+        const activeIndicators = new Set(['ma20']);
+
+        function toggleIndicator(ind) {
+            const btn = document.getElementById('ind-' + ind);
+            if (activeIndicators.has(ind)) {
+                activeIndicators.delete(ind);
+                btn.classList.remove('active');
+                btn.style.background = 'white';
+            } else {
+                activeIndicators.add(ind);
+                btn.classList.add('active');
+                const colorMap = { ma5: '#e74c3c', ma20: '#f39c12', ma60: '#2980b9', bb: '#9b59b6' };
+                btn.style.background = colorMap[ind];
+            }
+            if (priceChartData) {
+                renderPriceChart(priceChartData);
+            }
+        }
+
+        function renderPriceChart(data) {
+            const labels = data.data.map(d => d.date);
+            const closes = data.data.map(d => d.close);
+
+            const datasets = [{
+                label: '종가',
+                data: closes,
+                borderColor: '#2c3e50',
+                backgroundColor: (() => {
+                    const ctx = document.getElementById('priceChart').getContext('2d');
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 320);
+                    gradient.addColorStop(0, 'rgba(44,62,80,0.25)');
+                    gradient.addColorStop(1, 'rgba(44,62,80,0)');
+                    return gradient;
+                })(),
+                borderWidth: 2,
+                pointRadius: labels.length > 60 ? 0 : 2,
+                fill: true,
+                tension: 0.1
+            }];
+
+            if (activeIndicators.has('ma5')) {
+                datasets.push({
+                    label: 'MA5',
+                    data: data.data.map(d => d.ma5),
+                    borderColor: '#e74c3c',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.1
+                });
+            }
+            if (activeIndicators.has('ma20')) {
+                datasets.push({
+                    label: 'MA20',
+                    data: data.data.map(d => d.ma20),
+                    borderColor: '#f39c12',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.1
+                });
+            }
+            if (activeIndicators.has('ma60')) {
+                datasets.push({
+                    label: 'MA60',
+                    data: data.data.map(d => d.ma60),
+                    borderColor: '#2980b9',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.1
+                });
+            }
+            if (activeIndicators.has('bb')) {
+                datasets.push({
+                    label: 'BB Upper',
+                    data: data.data.map(d => d.bb_upper),
+                    borderColor: '#9b59b6',
+                    borderWidth: 1.5,
+                    borderDash: [4, 4],
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.1
+                });
+                datasets.push({
+                    label: 'BB Lower',
+                    data: data.data.map(d => d.bb_lower),
+                    borderColor: '#9b59b6',
+                    borderWidth: 1.5,
+                    borderDash: [4, 4],
+                    pointRadius: 0,
+                    fill: '-1',
+                    backgroundColor: 'rgba(155,89,182,0.1)',
+                    tension: 0.1
+                });
+            }
+
+            if (priceChartInstance) priceChartInstance.destroy();
+
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            priceChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: true },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ctx.dataset.label + ': ₩' + (ctx.parsed.y ? ctx.parsed.y.toLocaleString() : 'N/A')
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { maxTicksLimit: 8, maxRotation: 0, font: { size: 11 } },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: {
+                                callback: v => '₩' + v.toLocaleString(),
+                                font: { size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function loadPriceChart(period) {
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.period === period);
+            });
+            document.getElementById('price-chart-error').innerHTML = '';
+
+            fetch('/api/stock/kr/005930/price-history?period=' + period)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('price-chart-error').innerHTML =
+                            '<span class="error">오류: ' + data.error + '</span>';
+                        return;
+                    }
+                    priceChartData = data;
+                    renderPriceChart(data);
+                })
+                .catch(e => {
+                    document.getElementById('price-chart-error').innerHTML =
+                        '<span class="error">차트 로드 실패: ' + e.message + '</span>';
+                });
+        }
+
+        // 페이지 로드 시 기본 달(1m) 차트 표시
+        loadPriceChart('1m');
+
         // DB 상태 확인
         fetch('/health')
             .then(r => r.json())
@@ -395,6 +586,37 @@ def stock_kr(code):
             "code": code,
             "count": len(df),
             "data": df.tail(5).to_dict(orient="records")
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/api/stock/kr/<code>/price-history")
+def stock_kr_price_history(code):
+    period = request.args.get("period", "1m")
+    today = datetime.now()
+    days_map = {"1d": 30, "1w": 91, "1m": 365, "1y": 1095}
+    days = days_map.get(period, 365)
+    start = (today - timedelta(days=days)).strftime("%Y%m%d")
+    end = today.strftime("%Y%m%d")
+    try:
+        df = krx.get_ohlcv(code, start=start, end=end)
+        if df.empty:
+            return jsonify({"error": "No data found for code: " + code}), 404
+
+        df['ma5']  = df['close'].rolling(5).mean().round(0)
+        df['ma20'] = df['close'].rolling(20).mean().round(0)
+        df['ma60'] = df['close'].rolling(60).mean().round(0)
+        bb_std = df['close'].rolling(20).std()
+        df['bb_upper'] = (df['ma20'] + 2 * bb_std).round(0)
+        df['bb_lower'] = (df['ma20'] - 2 * bb_std).round(0)
+        df = df.where(pd.notna(df), other=None)
+
+        return jsonify({
+            "code": code,
+            "period": period,
+            "count": len(df),
+            "data": df.to_dict(orient="records")
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
