@@ -62,13 +62,24 @@ class FinancialAnalyzer:
             except Exception:
                 continue
 
+        # 단순평균은 이상치(예: EPS가 작아 PER이 수천인 종목)에 크게 왜곡되므로
+        # 이상치에 강건한 중앙값(median)을 사용한다.
         return {
-            "per": sum(per_values) / len(per_values) if per_values else 0,
-            "pbr": sum(pbr_values) / len(pbr_values) if pbr_values else 0,
-            "roe": sum(roe_values) / len(roe_values) if roe_values else 0,
-            "dividend_yield": sum(dividend_values) / len(dividend_values) if dividend_values else 0,
+            "per": self._median(per_values),
+            "pbr": self._median(pbr_values),
+            "roe": self._median(roe_values),
+            "dividend_yield": self._median(dividend_values),
             "peer_count": len(per_values),
         }
+
+    @staticmethod
+    def _median(values: list) -> float:
+        if not values:
+            return 0
+        s = sorted(values)
+        n = len(s)
+        mid = n // 2
+        return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
 
     def determine_verdict(self, metrics: dict, industry_avg: dict) -> str:
         per_lower = metrics.get("per", 0) < industry_avg.get("per", float("inf"))

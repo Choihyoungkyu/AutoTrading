@@ -131,8 +131,9 @@ def analyze_financial(code):
         if not result:
             return jsonify({"error": "No data found for code: " + code}), 404
 
+        result = _ensure_as_of(code, result)
         store.save_financial(code, result)
-        return jsonify(_ensure_as_of(code, result))
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
