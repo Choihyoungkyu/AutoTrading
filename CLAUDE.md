@@ -79,3 +79,56 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+## 5. Responsive Design Standards
+
+**Mobile-first approach. All pages must work on smartphones and desktops.**
+
+### Breakpoints
+- **Mobile:** < 768px (phones)
+- **Tablet:** 768px - 1023px
+- **Desktop:** ≥ 1024px
+
+### Base Styles (Mobile)
+All styles start mobile-first (< 768px):
+- Single column layouts by default
+- Padding: 12-15px
+- Font sizes: 12-14px for body, 18-20px for headers
+- Touch-friendly buttons: min 44px height/width
+- Simplified grids (1 column)
+
+### Media Query Additions
+Add enhancements at breakpoints using `@media (min-width: 768px)`:
+```css
+/* Tablet and desktop improvements */
+@media (min-width: 768px) {
+  .container { padding: 20px; }
+  .grid { grid-template-columns: 1fr 1fr; }  /* 2-column */
+  header h1 { font-size: 28px; }
+}
+
+@media (min-width: 1024px) {
+  .price-chart { height: 380px; }  /* Larger charts */
+}
+```
+
+### Common Components
+- **Tables:** Stack columns on mobile, horizontal scroll fallback
+- **Grids:** 1 col mobile → 2 col tablet → 3 col desktop
+- **Cards:** Full width mobile, side-by-side on tablet+
+- **Navigation:** Hamburger/stacked mobile, horizontal desktop
+- **Charts:** Reduce height on mobile (250-280px), expand on desktop (320-380px)
+- **Tooltips:** Adjusted width (200-250px mobile, 300-320px desktop)
+
+### Testing Checklist
+1. Test on actual mobile device or Chrome DevTools (375px, 768px, 1024px widths)
+2. Verify touch targets (buttons, links) are ≥ 44px
+3. Check table readability (font size, scrollable if needed)
+4. Ensure chart legends don't overflow
+5. Test form inputs are readable on mobile
+
+### Don't
+- Use desktop-only fixed widths
+- Assume hover states work (mobile has no hover)
+- Hide content from mobile without reason
+- Use `vh` units for full-screen mobile layouts (address bar issues)

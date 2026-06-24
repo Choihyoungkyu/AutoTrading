@@ -25,53 +25,108 @@ HTML_TEMPLATE = """
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        header { background: #2c3e50; color: white; padding: 30px; border-radius: 8px; margin-bottom: 30px; }
-        header h1 { font-size: 32px; margin-bottom: 10px; }
-        header p { font-size: 16px; opacity: 0.9; }
-        .status { display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
-        .status-item { display: flex; align-items: center; gap: 8px; }
-        .status-badge { background: #27ae60; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        .main { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-        .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .card h2 { color: #2c3e50; margin-bottom: 15px; font-size: 20px; }
-        .data-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        .data-table th { background: #f8f9fa; padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600; color: #495057; }
-        .data-table td { padding: 12px; border-bottom: 1px solid #dee2e6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 15px; }
+        header { background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        header h1 { font-size: 24px; margin-bottom: 8px; }
+        header p { font-size: 14px; opacity: 0.9; }
+        .status { display: flex; gap: 12px; margin-top: 15px; flex-wrap: wrap; }
+        .status-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+        .status-badge { background: #27ae60; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .main { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 20px; }
+        .card { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .card h2 { color: #2c3e50; margin-bottom: 12px; font-size: 18px; }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+        .data-table th { background: #f8f9fa; padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600; color: #495057; font-size: 12px; }
+        .data-table td { padding: 8px; border-bottom: 1px solid #dee2e6; }
         .data-table tr:hover { background: #f8f9fa; }
         .status-ok { color: #27ae60; font-weight: bold; }
         .status-error { color: #e74c3c; font-weight: bold; }
         .value-up { color: #27ae60; }
         .value-down { color: #e74c3c; }
-        .chart-container { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 15px; text-align: center; color: #7f8c8d; }
-        .footer { text-align: center; color: #7f8c8d; font-size: 12px; margin-top: 30px; }
-        .loading { color: #7f8c8d; font-size: 14px; }
-        .error { color: #e74c3c; background: #fadbd8; padding: 12px; border-radius: 4px; margin-top: 15px; }
-        .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px; }
-        .metric-box { background: #f8f9fa; padding: 12px; border-radius: 6px; }
-        .metric-label { font-size: 12px; color: #7f8c8d; font-weight: 600; }
-        .metric-value { font-size: 24px; font-weight: bold; color: #2c3e50; margin-top: 5px; }
-        .verdict-badge { display: inline-block; padding: 8px 16px; border-radius: 20px; font-weight: bold; margin-top: 10px; }
+        .footer { text-align: center; color: #7f8c8d; font-size: 11px; margin-top: 20px; }
+        .loading { color: #7f8c8d; font-size: 13px; }
+        .error { color: #e74c3c; background: #fadbd8; padding: 10px; border-radius: 4px; margin-top: 12px; font-size: 12px; }
+        .metrics-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
+        .metric-box { background: #f8f9fa; padding: 10px; border-radius: 6px; }
+        .metric-label { font-size: 11px; color: #7f8c8d; font-weight: 600; }
+        .metric-value { font-size: 20px; font-weight: bold; color: #2c3e50; margin-top: 4px; }
+        .verdict-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-weight: bold; margin-top: 8px; font-size: 14px; }
         .verdict-undervalued { background: #d4edda; color: #155724; }
         .verdict-overvalued { background: #f8d7da; color: #721c24; }
         .verdict-neutral { background: #fff3cd; color: #856404; }
-        .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; }
-        .comparison-card { background: #f8f9fa; padding: 15px; border-radius: 6px; }
-        .comparison-title { font-weight: 600; color: #2c3e50; margin-bottom: 10px; }
-        .tooltip-icon { display: inline-block; width: 16px; height: 16px; margin-left: 6px; background: #3498db; color: white; border-radius: 50%; text-align: center; line-height: 16px; font-size: 11px; font-weight: bold; cursor: help; position: relative; }
-        .tooltip-icon:hover::after { content: attr(data-tooltip); position: absolute; background: #2c3e50; color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; white-space: nowrap; bottom: 125%; left: 50%; transform: translateX(-50%); z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.2); font-weight: normal; }
-        .tooltip-icon:hover::before { content: ""; position: absolute; background: #2c3e50; width: 6px; height: 6px; bottom: 115%; left: 50%; transform: translateX(-50%) rotate(45deg); z-index: 999; }
+        .comparison { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
+        .comparison-card { background: #f8f9fa; padding: 12px; border-radius: 6px; }
+        .comparison-title { font-weight: 600; color: #2c3e50; margin-bottom: 8px; font-size: 14px; }
+        .tooltip-icon { display: inline-block; width: 14px; height: 14px; margin-left: 4px; background: #3498db; color: white; border-radius: 50%; text-align: center; line-height: 14px; font-size: 9px; font-weight: bold; cursor: help; position: relative; }
+        .tooltip-icon:hover::after { content: attr(data-tooltip); position: absolute; background: #2c3e50; color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; bottom: 120%; left: 50%; transform: translateX(-50%); z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.2); font-weight: normal; white-space: pre-wrap; word-wrap: break-word; width: 200px; text-align: center; }
+        .tooltip-icon:hover::before { content: ""; position: absolute; background: #2c3e50; width: 4px; height: 4px; bottom: 110%; left: 50%; transform: translateX(-50%) rotate(45deg); z-index: 999; }
         .ind-btn { position: relative; }
-        .ind-btn:hover::after { content: attr(data-tooltip); position: absolute; background: #2c3e50; color: white; padding: 12px 16px; border-radius: 4px; font-size: 13px; width: 320px; bottom: 140%; left: 50%; transform: translateX(-50%); z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.2); line-height: 1.6; text-align: center; white-space: pre-wrap; word-wrap: break-word; display: block; }
-        .ind-btn:hover::before { content: ""; position: absolute; background: #2c3e50; width: 6px; height: 6px; bottom: 120%; left: 50%; transform: translateX(-50%) rotate(45deg); z-index: 999; }
-        .period-buttons { display: flex; gap: 8px; margin-bottom: 16px; }
-        .period-btn { padding: 6px 18px; border: 1px solid #dee2e6; border-radius: 20px; background: white; cursor: pointer; font-size: 14px; color: #495057; transition: all 0.15s; }
+        .ind-btn:hover::after { content: attr(data-tooltip); position: absolute; background: #2c3e50; color: white; padding: 8px 12px; border-radius: 4px; font-size: 11px; width: 240px; bottom: 130%; left: 50%; transform: translateX(-50%); z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.2); line-height: 1.5; text-align: center; white-space: pre-wrap; word-wrap: break-word; display: block; }
+        .ind-btn:hover::before { content: ""; position: absolute; background: #2c3e50; width: 4px; height: 4px; bottom: 120%; left: 50%; transform: translateX(-50%) rotate(45deg); z-index: 999; }
+        .period-buttons { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+        .period-btn { padding: 5px 14px; border: 1px solid #dee2e6; border-radius: 20px; background: white; cursor: pointer; font-size: 12px; color: #495057; transition: all 0.15s; }
         .period-btn:hover { background: #e9ecef; }
         .period-btn.active { background: #2c3e50; color: white; border-color: #2c3e50; }
-        .indicator-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-        .ind-btn { padding: 4px 14px; border-radius: 20px; border: 2px solid; background: white; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s; }
+        .indicator-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+        .ind-btn { padding: 4px 12px; border-radius: 20px; border: 2px solid; background: white; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.15s; }
         .ind-btn.active { color: white !important; }
-        .price-chart-wrap { position: relative; height: 320px; margin-top: 8px; }
+        .price-chart-wrap { position: relative; height: 250px; margin-top: 8px; }
+
+        /* Tablet (768px 이상) */
+        @media (min-width: 768px) {
+            .container { padding: 20px; }
+            header { padding: 30px; margin-bottom: 30px; }
+            header h1 { font-size: 28px; }
+            header p { font-size: 15px; }
+            .status { gap: 20px; margin-top: 20px; }
+            .status-item { gap: 8px; font-size: 13px; }
+            .status-badge { padding: 6px 12px; font-size: 12px; }
+            .main { grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+            .card { padding: 20px; margin-bottom: 20px; }
+            .card h2 { font-size: 20px; margin-bottom: 15px; }
+            .data-table { font-size: 14px; margin-top: 15px; }
+            .data-table th { padding: 12px; font-size: 13px; }
+            .data-table td { padding: 12px; }
+            .metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 15px; }
+            .metric-box { padding: 12px; }
+            .metric-label { font-size: 12px; }
+            .metric-value { font-size: 24px; }
+            .verdict-badge { padding: 8px 16px; font-size: 16px; }
+            .comparison { grid-template-columns: 1fr 1fr; gap: 20px; }
+            .comparison-card { padding: 15px; }
+            .comparison-title { font-size: 15px; }
+            .footer { font-size: 13px; margin-top: 30px; }
+            .loading { font-size: 14px; }
+            .error { padding: 12px; font-size: 13px; }
+            .period-buttons { gap: 8px; }
+            .period-btn { padding: 6px 18px; font-size: 14px; }
+            .indicator-filters { gap: 8px; margin-bottom: 12px; }
+            .ind-btn { padding: 4px 14px; font-size: 12px; }
+            .price-chart-wrap { height: 320px; }
+            .tooltip-icon { width: 16px; height: 16px; line-height: 16px; font-size: 11px; }
+            .tooltip-icon:hover::after { font-size: 12px; width: 250px; }
+            .ind-btn:hover::after { font-size: 13px; width: 320px; }
+        }
+
+        /* Desktop (1024px 이상) */
+        @media (min-width: 1024px) {
+            .container { padding: 20px; }
+            .price-chart-wrap { height: 380px; }
+        }
+
+        /* 테이블 모바일 스크롤 */
+        .data-table { overflow-x: auto; display: block; }
+        @media (max-width: 767px) {
+            .data-table { font-size: 12px; }
+            .data-table th { padding: 6px; font-size: 11px; }
+            .data-table td { padding: 6px; }
+            .data-table th:nth-child(2),
+            .data-table th:nth-child(3),
+            .data-table th:nth-child(4),
+            .data-table td:nth-child(2),
+            .data-table td:nth-child(3),
+            .data-table td:nth-child(4) { font-size: 11px; }
+        }
     </style>
 </head>
 <body>
