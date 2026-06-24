@@ -58,6 +58,9 @@ HTML_TEMPLATE = """
         .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; }
         .comparison-card { background: #f8f9fa; padding: 15px; border-radius: 6px; }
         .comparison-title { font-weight: 600; color: #2c3e50; margin-bottom: 10px; }
+        .tooltip-icon { display: inline-block; width: 16px; height: 16px; margin-left: 6px; background: #3498db; color: white; border-radius: 50%; text-align: center; line-height: 16px; font-size: 11px; font-weight: bold; cursor: help; position: relative; }
+        .tooltip-icon:hover::after { content: attr(data-tooltip); position: absolute; background: #2c3e50; color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; white-space: nowrap; bottom: 125%; left: 50%; transform: translateX(-50%); z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.2); font-weight: normal; }
+        .tooltip-icon:hover::before { content: ""; position: absolute; background: #2c3e50; width: 6px; height: 6px; bottom: 115%; left: 50%; transform: translateX(-50%) rotate(45deg); z-index: 999; }
         .period-buttons { display: flex; gap: 8px; margin-bottom: 16px; }
         .period-btn { padding: 6px 18px; border: 1px solid #dee2e6; border-radius: 20px; background: white; cursor: pointer; font-size: 14px; color: #495057; transition: all 0.15s; }
         .period-btn:hover { background: #e9ecef; }
@@ -491,28 +494,40 @@ HTML_TEMPLATE = """
 
                         <div class="metrics-grid">
                             <div class="metric-box">
-                                <div class="metric-label">RSI (14주기)</div>
+                                <div class="metric-label">
+                                    RSI (14주기)
+                                    <span class="tooltip-icon" data-tooltip="상대강도지수: 0~100 범위에서 매도/매수 과열 정도를 나타냄">?</span>
+                                </div>
                                 <div class="metric-value">${data.rsi.toFixed(2)}</div>
                                 <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
                                     ${data.rsi < 30 ? '과매도' : (data.rsi > 70 ? '과매수' : '중립')}
                                 </div>
                             </div>
                             <div class="metric-box">
-                                <div class="metric-label">이동평균선 20일</div>
+                                <div class="metric-label">
+                                    이동평균선 20일
+                                    <span class="tooltip-icon" data-tooltip="최근 20일간의 평균 가격. 단기 추세를 나타냄">?</span>
+                                </div>
                                 <div class="metric-value">${data.ma_20.toLocaleString()}</div>
                                 <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
                                     ${data.ma_20 > data.ma_50 ? '↑ 상승추세' : '↓ 하락추세'}
                                 </div>
                             </div>
                             <div class="metric-box">
-                                <div class="metric-label">이동평균선 50일</div>
+                                <div class="metric-label">
+                                    이동평균선 50일
+                                    <span class="tooltip-icon" data-tooltip="최근 50일간의 평균 가격. 중기 추세와 지지/저항선 역할">?</span>
+                                </div>
                                 <div class="metric-value">${data.ma_50.toLocaleString()}</div>
                                 <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
                                     기준선
                                 </div>
                             </div>
                             <div class="metric-box">
-                                <div class="metric-label">MACD 히스토그램</div>
+                                <div class="metric-label">
+                                    MACD 히스토그램
+                                    <span class="tooltip-icon" data-tooltip="MACD 지수이동평균: 단기와 중기 추세의 교차점을 통해 신호 감지">?</span>
+                                </div>
                                 <div class="metric-value" style="color: ${data.macd.histogram > 0 ? '#27ae60' : '#e74c3c'}">
                                     ${data.macd.histogram.toFixed(2)}
                                 </div>
@@ -524,19 +539,43 @@ HTML_TEMPLATE = """
 
                         <div class="comparison">
                             <div class="comparison-card">
-                                <div class="comparison-title">📊 기술적 지표</div>
+                                <div class="comparison-title">
+                                    📊 기술적 지표
+                                    <span class="tooltip-icon" data-tooltip="MACD(Moving Average Convergence Divergence)는 단기와 중기 이동평균의 차이를 통해 추세 변화를 감지하는 지표">?</span>
+                                </div>
                                 <div style="font-size: 12px; line-height: 1.8; color: #495057;">
-                                    <div>MACD Line: ${data.macd.line.toFixed(2)}</div>
-                                    <div>MACD Signal: ${data.macd.signal.toFixed(2)}</div>
-                                    <div>MACD Histogram: ${data.macd.histogram.toFixed(2)}</div>
+                                    <div>
+                                        <strong>MACD Line:</strong> ${data.macd.line.toFixed(2)}
+                                        <span class="tooltip-icon" data-tooltip="12일 EMA - 26일 EMA">?</span>
+                                    </div>
+                                    <div>
+                                        <strong>Signal:</strong> ${data.macd.signal.toFixed(2)}
+                                        <span class="tooltip-icon" data-tooltip="MACD의 9일 EMA (신호선)">?</span>
+                                    </div>
+                                    <div>
+                                        <strong>Histogram:</strong> ${data.macd.histogram.toFixed(2)}
+                                        <span class="tooltip-icon" data-tooltip="MACD Line - Signal의 차이 (양수=상승, 음수=하락)">?</span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="comparison-card">
-                                <div class="comparison-title">📈 볼린저밴드 (20, 2σ)</div>
+                                <div class="comparison-title">
+                                    📈 볼린저밴드 (20, 2σ)
+                                    <span class="tooltip-icon" data-tooltip="이동평균을 중심으로 표준편차 범위의 상/하단선. 가격 변동성을 나타냄">?</span>
+                                </div>
                                 <div style="font-size: 12px; line-height: 1.8; color: #495057;">
-                                    <div>상단: ${data.bollinger_band.upper.toLocaleString()}</div>
-                                    <div>중단: ${data.bollinger_band.middle.toLocaleString()}</div>
-                                    <div>하단: ${data.bollinger_band.lower.toLocaleString()}</div>
+                                    <div>
+                                        <strong>상단:</strong> ${data.bollinger_band.upper.toLocaleString()}
+                                        <span class="tooltip-icon" data-tooltip="저항선(과매수 신호)">?</span>
+                                    </div>
+                                    <div>
+                                        <strong>중단:</strong> ${data.bollinger_band.middle.toLocaleString()}
+                                        <span class="tooltip-icon" data-tooltip="20일 이동평균선">?</span>
+                                    </div>
+                                    <div>
+                                        <strong>하단:</strong> ${data.bollinger_band.lower.toLocaleString()}
+                                        <span class="tooltip-icon" data-tooltip="지지선(과매도 신호)">?</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
