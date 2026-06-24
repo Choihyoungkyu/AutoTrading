@@ -3,12 +3,14 @@ from src.collectors.krx_collector import KRXCollector
 from src.collectors.yfinance_collector import YFinanceCollector
 from src.storage.data_store import DataStore
 from src.analyzers.financial_analyzer import FinancialAnalyzer
+from src.analyzers.chart_analyzer import ChartAnalyzer
 
 api_bp = Blueprint("api", __name__)
 krx = KRXCollector()
 yf = YFinanceCollector()
 store = DataStore()
 financial_analyzer = FinancialAnalyzer(krx, yf)
+chart_analyzer = ChartAnalyzer(yf)
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -42,6 +44,17 @@ HTML_TEMPLATE = """
         .footer { text-align: center; color: #7f8c8d; font-size: 12px; margin-top: 30px; }
         .loading { color: #7f8c8d; font-size: 14px; }
         .error { color: #e74c3c; background: #fadbd8; padding: 12px; border-radius: 4px; margin-top: 15px; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px; }
+        .metric-box { background: #f8f9fa; padding: 12px; border-radius: 6px; }
+        .metric-label { font-size: 12px; color: #7f8c8d; font-weight: 600; }
+        .metric-value { font-size: 24px; font-weight: bold; color: #2c3e50; margin-top: 5px; }
+        .verdict-badge { display: inline-block; padding: 8px 16px; border-radius: 20px; font-weight: bold; margin-top: 10px; }
+        .verdict-undervalued { background: #d4edda; color: #155724; }
+        .verdict-overvalued { background: #f8d7da; color: #721c24; }
+        .verdict-neutral { background: #fff3cd; color: #856404; }
+        .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; }
+        .comparison-card { background: #f8f9fa; padding: 15px; border-radius: 6px; }
+        .comparison-title { font-weight: 600; color: #2c3e50; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -91,6 +104,11 @@ HTML_TEMPLATE = """
                     <tr><td colspan="6" class="loading">데이터 로드 중...</td></tr>
                 </tbody>
             </table>
+        </div>
+
+        <div class="card">
+            <h2>💰 재무 분석 (이슈 002)</h2>
+            <div id="financial-analysis" class="loading">분석 중...</div>
         </div>
 
         <div class="footer">
@@ -167,6 +185,89 @@ HTML_TEMPLATE = """
                 document.getElementById('krx-data').innerHTML = '<span class="error">오류: ' + e.message + '</span>';
                 document.getElementById('data-rows').innerHTML = '<tr><td colspan="6" class="error">데이터 로드 실패</td></tr>';
             });
+
+        // 재무 분석 데이터 조회
+        fetch('/analyze/005930/financial')
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('financial-analysis').innerHTML = '<span class="error">오류: ' + data.error + '</span>';
+                    return;
+                }
+
+                const verdictClass = 'verdict-' + (
+                    data.verdict === '저평가' ? 'undervalued' :
+                    data.verdict === '고평가' ? 'overvalued' : 'neutral'
+                );
+
+                const perStatus = data.per < data.industry_avg.per ? '✓ 저평가' : '✗ 고평가';
+                const pbrStatus = data.pbr < data.industry_avg.pbr ? '✓ 저평가' : '✗ 고평가';
+
+                document.getElementById('financial-analysis').innerHTML = `
+                    <div style="margin-top: 15px;">
+                        <div style="margin-bottom: 20px;">
+                            <strong style="font-size: 18px;">판정 결과</strong>
+                            <div class="verdict-badge ${verdictClass}" style="font-size: 16px;">
+                                ${data.verdict}
+                            </div>
+                        </div>
+
+                        <div class="metrics-grid">
+                            <div class="metric-box">
+                                <div class="metric-label">PER (주가수익비율)</div>
+                                <div class="metric-value">${data.per.toFixed(1)}</div>
+                                <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                                    업계평균: ${data.industry_avg.per.toFixed(1)} ${perStatus}
+                                </div>
+                            </div>
+                            <div class="metric-box">
+                                <div class="metric-label">PBR (주가순자산비율)</div>
+                                <div class="metric-value">${data.pbr.toFixed(2)}</div>
+                                <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                                    업계평균: ${data.industry_avg.pbr.toFixed(2)} ${pbrStatus}
+                                </div>
+                            </div>
+                            <div class="metric-box">
+                                <div class="metric-label">ROE (자기자본수익률)</div>
+                                <div class="metric-value">${data.roe.toFixed(1)}%</div>
+                                <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                                    업계평균: ${data.industry_avg.roe.toFixed(1)}%
+                                </div>
+                            </div>
+                            <div class="metric-box">
+                                <div class="metric-label">배당수익률</div>
+                                <div class="metric-value">${data.dividend_yield.toFixed(2)}%</div>
+                                <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                                    업계평균: ${data.industry_avg.dividend_yield.toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="comparison">
+                            <div class="comparison-card">
+                                <div class="comparison-title">📊 삼성전자 재무지표</div>
+                                <div style="font-size: 12px; line-height: 1.8; color: #495057;">
+                                    <div>EPS: ${data.eps.toLocaleString()}원</div>
+                                    <div>BPS: ${data.bps.toLocaleString()}원</div>
+                                    <div>부채비율: ${data.debt_ratio.toFixed(1)}%</div>
+                                </div>
+                            </div>
+                            <div class="comparison-card">
+                                <div class="comparison-title">🏭 반도체 업계 평균</div>
+                                <div style="font-size: 12px; color: #7f8c8d;">
+                                    <div>4개사 (SK하이닉스, DB하이텍, 주성엔지니어링, 원익IPS)</div>
+                                    <div style="margin-top: 8px; color: #495057;">
+                                        PER: ${data.industry_avg.per.toFixed(1)} | PBR: ${data.industry_avg.pbr.toFixed(2)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            })
+            .catch(e => {
+                document.getElementById('financial-analysis').innerHTML = '<span class="error">재무 분석 로드 실패: ' + e.message + '</span>';
+            });
     </script>
 </body>
 </html>
@@ -224,6 +325,17 @@ def stock_us(symbol):
 def analyze_financial(code):
     try:
         result = financial_analyzer.analyze(code)
+        if not result:
+            return jsonify({"error": "No data found for code: " + code}), 404
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/analyze/<code>/chart")
+def analyze_chart(code):
+    try:
+        result = chart_analyzer.analyze(code)
         if not result:
             return jsonify({"error": "No data found for code: " + code}), 404
         return jsonify(result)
