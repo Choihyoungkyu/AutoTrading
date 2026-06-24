@@ -61,6 +61,9 @@ HTML_TEMPLATE = """
         .tooltip-icon { display: inline-block; width: 16px; height: 16px; margin-left: 6px; background: #3498db; color: white; border-radius: 50%; text-align: center; line-height: 16px; font-size: 11px; font-weight: bold; cursor: help; position: relative; }
         .tooltip-icon:hover::after { content: attr(data-tooltip); position: absolute; background: #2c3e50; color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; white-space: nowrap; bottom: 125%; left: 50%; transform: translateX(-50%); z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.2); font-weight: normal; }
         .tooltip-icon:hover::before { content: ""; position: absolute; background: #2c3e50; width: 6px; height: 6px; bottom: 115%; left: 50%; transform: translateX(-50%) rotate(45deg); z-index: 999; }
+        .ind-btn { position: relative; }
+        .ind-btn:hover::after { content: attr(data-tooltip); position: absolute; background: #2c3e50; color: white; padding: 10px 14px; border-radius: 4px; font-size: 12px; white-space: normal; max-width: 200px; bottom: 130%; left: 50%; transform: translateX(-50%); z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.2); line-height: 1.4; }
+        .ind-btn:hover::before { content: ""; position: absolute; background: #2c3e50; width: 6px; height: 6px; bottom: 120%; left: 50%; transform: translateX(-50%) rotate(45deg); z-index: 999; }
         .period-buttons { display: flex; gap: 8px; margin-bottom: 16px; }
         .period-btn { padding: 6px 18px; border: 1px solid #dee2e6; border-radius: 20px; background: white; cursor: pointer; font-size: 14px; color: #495057; transition: all 0.15s; }
         .period-btn:hover { background: #e9ecef; }
@@ -129,10 +132,10 @@ HTML_TEMPLATE = """
                 <button class="period-btn" data-period="1y" onclick="loadPriceChart('1y')">년</button>
             </div>
             <div class="indicator-filters">
-                <button class="ind-btn" id="ind-ma5"  style="border-color:#e74c3c;color:#e74c3c"  onclick="toggleIndicator('ma5')">MA5</button>
-                <button class="ind-btn active" id="ind-ma20" style="border-color:#f39c12;background:#f39c12;color:white" onclick="toggleIndicator('ma20')">MA20</button>
-                <button class="ind-btn" id="ind-ma60" style="border-color:#2980b9;color:#2980b9"  onclick="toggleIndicator('ma60')">MA60</button>
-                <button class="ind-btn" id="ind-bb"   style="border-color:#9b59b6;color:#9b59b6"  onclick="toggleIndicator('bb')">볼린저밴드</button>
+                <button class="ind-btn" id="ind-ma5" style="border-color:#e74c3c;color:#e74c3c" data-tooltip="최근 5일 평균가격. 가장 빠른 단기 추세 변화를 나타냄" onclick="toggleIndicator('ma5')">MA5</button>
+                <button class="ind-btn active" id="ind-ma20" style="border-color:#f39c12;background:#f39c12;color:#f39c12" data-tooltip="최근 20일 평균가격. 단기 추세와 매매신호를 나타냄" onclick="toggleIndicator('ma20')">MA20</button>
+                <button class="ind-btn" id="ind-ma60" style="border-color:#2980b9;color:#2980b9" data-tooltip="최근 60일 평균가격. 중기 추세의 흐름을 나타냄" onclick="toggleIndicator('ma60')">MA60</button>
+                <button class="ind-btn" id="ind-bb" style="border-color:#9b59b6;color:#9b59b6" data-tooltip="이동평균을 중심으로 표준편차 범위의 밴드. 가격 변동성과 과매수/과매도를 나타냄" onclick="toggleIndicator('bb')">볼린저밴드</button>
             </div>
             <div class="price-chart-wrap">
                 <canvas id="priceChart"></canvas>
@@ -166,15 +169,19 @@ HTML_TEMPLATE = """
 
         function toggleIndicator(ind) {
             const btn = document.getElementById('ind-' + ind);
+            const colorMap = { ma5: '#e74c3c', ma20: '#f39c12', ma60: '#2980b9', bb: '#9b59b6' };
+            const borderColor = btn.style.borderColor;
+
             if (activeIndicators.has(ind)) {
                 activeIndicators.delete(ind);
                 btn.classList.remove('active');
                 btn.style.background = 'white';
+                btn.style.color = borderColor;  // 테두리색과 동일하게 설정
             } else {
                 activeIndicators.add(ind);
                 btn.classList.add('active');
-                const colorMap = { ma5: '#e74c3c', ma20: '#f39c12', ma60: '#2980b9', bb: '#9b59b6' };
                 btn.style.background = colorMap[ind];
+                btn.style.color = 'white';  // 선택 시 흰색
             }
             if (priceChartData) {
                 renderPriceChart(priceChartData);
