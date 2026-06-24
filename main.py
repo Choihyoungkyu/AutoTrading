@@ -4,7 +4,8 @@ import os
 
 
 def create_app():
-    app = Flask(__name__)
+    # frontend/dist(빌드 산출물)를 정적으로 서빙. /assets/* 등은 Flask가 자동 처리.
+    app = Flask(__name__, static_folder="frontend/dist", static_url_path="")
     app.register_blueprint(api_bp)
     return app
 
