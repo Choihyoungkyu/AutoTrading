@@ -111,8 +111,15 @@ HTML_TEMPLATE = """
             <div id="financial-analysis" class="loading">분석 중...</div>
         </div>
 
+        <div class="card">
+            <h2>📈 기술적 분석 - 차트 분석 (이슈 003)</h2>
+            <div id="chart-analysis" class="loading">분석 중...</div>
+        </div>
+
         <div class="footer">
             <p>이슈 001: 프로젝트 초기화 & 데이터 수집 기본 구조</p>
+            <p>이슈 002: 삼성전자 재무 분석 엔드포인트 구현</p>
+            <p>이슈 003: 삼성전자 기술적 분석 차트 API 구현</p>
             <p>© 2026 주식 분석 시스템 | Flask + PYKRX + yfinance</p>
         </div>
     </div>
@@ -267,6 +274,93 @@ HTML_TEMPLATE = """
             })
             .catch(e => {
                 document.getElementById('financial-analysis').innerHTML = '<span class="error">재무 분석 로드 실패: ' + e.message + '</span>';
+            });
+
+        // 차트 분석 데이터 조회
+        fetch('/analyze/005930/chart')
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('chart-analysis').innerHTML = '<span class="error">오류: ' + data.error + '</span>';
+                    return;
+                }
+
+                const signalClass = data.signal === 'buy' ? 'value-up' : (data.signal === 'sell' ? 'value-down' : 'neutral');
+                const signalColor = data.signal === 'buy' ? '#27ae60' : (data.signal === 'sell' ? '#e74c3c' : '#f39c12');
+                const signalKo = data.signal === 'buy' ? '매수' : (data.signal === 'sell' ? '매도' : '중립');
+
+                document.getElementById('chart-analysis').innerHTML = `
+                    <div style="margin-top: 15px;">
+                        <div style="margin-bottom: 20px;">
+                            <strong style="font-size: 18px;">매매 신호</strong>
+                            <div style="display: inline-block; background: ${signalColor}; color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; margin-top: 10px; font-size: 16px;">
+                                ${signalKo} (신뢰도: ${(data.confidence * 100).toFixed(0)}%)
+                            </div>
+                        </div>
+
+                        <div class="metrics-grid">
+                            <div class="metric-box">
+                                <div class="metric-label">RSI (14주기)</div>
+                                <div class="metric-value">${data.rsi.toFixed(2)}</div>
+                                <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                                    ${data.rsi < 30 ? '과매도' : (data.rsi > 70 ? '과매수' : '중립')}
+                                </div>
+                            </div>
+                            <div class="metric-box">
+                                <div class="metric-label">이동평균선 20일</div>
+                                <div class="metric-value">${data.ma_20.toLocaleString()}</div>
+                                <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                                    ${data.ma_20 > data.ma_50 ? '↑ 상승추세' : '↓ 하락추세'}
+                                </div>
+                            </div>
+                            <div class="metric-box">
+                                <div class="metric-label">이동평균선 50일</div>
+                                <div class="metric-value">${data.ma_50.toLocaleString()}</div>
+                                <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                                    기준선
+                                </div>
+                            </div>
+                            <div class="metric-box">
+                                <div class="metric-label">MACD 히스토그램</div>
+                                <div class="metric-value" style="color: ${data.macd.histogram > 0 ? '#27ae60' : '#e74c3c'}">
+                                    ${data.macd.histogram.toFixed(2)}
+                                </div>
+                                <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                                    ${data.macd.histogram > 0 ? '상승' : '하락'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="comparison">
+                            <div class="comparison-card">
+                                <div class="comparison-title">📊 기술적 지표</div>
+                                <div style="font-size: 12px; line-height: 1.8; color: #495057;">
+                                    <div>MACD Line: ${data.macd.line.toFixed(2)}</div>
+                                    <div>MACD Signal: ${data.macd.signal.toFixed(2)}</div>
+                                    <div>MACD Histogram: ${data.macd.histogram.toFixed(2)}</div>
+                                </div>
+                            </div>
+                            <div class="comparison-card">
+                                <div class="comparison-title">📈 볼린저밴드 (20, 2σ)</div>
+                                <div style="font-size: 12px; line-height: 1.8; color: #495057;">
+                                    <div>상단: ${data.bollinger_band.upper.toLocaleString()}</div>
+                                    <div>중단: ${data.bollinger_band.middle.toLocaleString()}</div>
+                                    <div>하단: ${data.bollinger_band.lower.toLocaleString()}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 6px; font-size: 12px; color: #495057; line-height: 1.6;">
+                            <strong>신호 판단 규칙:</strong><br>
+                            • <span style="color: #27ae60;">매수:</span> RSI < 30 AND 20일선 > 50일선<br>
+                            • <span style="color: #e74c3c;">매도:</span> RSI > 70 AND 20일선 < 50일선<br>
+                            • <span style="color: #f39c12;">중립:</span> 위 조건 이외
+                        </div>
+                    </div>
+                `;
+            })
+            .catch(e => {
+                document.getElementById('chart-analysis').innerHTML = '<span class="error">차트 분석 로드 실패: ' + e.message + '</span>';
             });
     </script>
 </body>
