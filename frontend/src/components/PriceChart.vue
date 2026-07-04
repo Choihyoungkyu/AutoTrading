@@ -30,6 +30,7 @@ const INITIAL_WINDOW = 120
 const interval = ref('day')
 const active = reactive({ ma5: false, ma20: true, ma60: false, bb: false })
 const asof = ref('')
+const latestRate = ref(null)   // 최신 봉 등락률(%)
 const errorMsg = ref('')
 
 const canvas = ref(null)
@@ -119,6 +120,9 @@ function renderChart() {
   const rows = chartData.data
   const labels = rows.map((d) => d.date)
   asof.value = rows.length ? '기준일: ' + rows[rows.length - 1].date + ` · 총 ${rows.length}거래일` : ''
+  const n = rows.length
+  latestRate.value =
+    n >= 2 && rows[n - 2].close ? ((rows[n - 1].close - rows[n - 2].close) / rows[n - 2].close) * 100 : null
 
   // savedWindow(지표 토글 시 설정)가 있으면 그 범위를, 없으면 최근 구간을 표시
   if (chartInstance) chartInstance.destroy()
@@ -136,6 +140,27 @@ function renderChart() {
           callbacks: {
             label: (ctx) =>
               ctx.dataset.label + ': ₩' + (ctx.parsed.y ? ctx.parsed.y.toLocaleString() : 'N/A'),
+            // 시가·고가·저가 + 등락률(이전 봉 대비, 간격 무관하게 계산). 종가는 라벨 줄에 표시됨.
+            afterBody: (items) => {
+              const i = items[0]?.dataIndex
+              if (i == null) return ''
+              const r = rows[i]
+              if (!r) return ''
+              const won = (v) => '₩' + Number(v).toLocaleString()
+              const lines = [
+                '시가: ' + won(r.open),
+                '고가: ' + won(r.high),
+                '저가: ' + won(r.low),
+              ]
+              const prev = rows[i - 1]?.close
+              if (i > 0 && prev && r.close) {
+                const rate = ((r.close - prev) / prev) * 100
+                lines.push(`등락률: ${rate > 0 ? '+' : ''}${rate.toFixed(2)}%`)
+              } else {
+                lines.push('등락률: -')
+              }
+              return lines
+            },
           },
         },
         zoom: {
@@ -220,7 +245,12 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <div class="chart-hint">💡 마우스 휠(또는 핀치)로 확대·축소, 드래그로 기간 이동</div>
-    <div style="font-size:12px;color:#7f8c8d;margin-top:4px;">{{ asof }}</div>
+    <div style="font-size:12px;color:#7f8c8d;margin-top:4px;">
+      {{ asof }}
+      <span v-if="latestRate != null" :class="latestRate > 0 ? 'value-up' : 'value-down'" style="font-weight:600;">
+        · 등락률 {{ latestRate > 0 ? '+' : '' }}{{ latestRate.toFixed(2) }}%
+      </span>
+    </div>
     <div class="price-chart-wrap">
       <canvas ref="canvas"></canvas>
     </div>
