@@ -16,4 +16,5 @@ export const api = {
   financial: (code = STOCK_CODE) => getJson(`/analyze/${code}/financial`),
   chart: (code = STOCK_CODE) => getJson(`/analyze/${code}/chart`),
   news: (code = STOCK_CODE) => getJson(`/analyze/${code}/news`),
+  recommendation: (code = STOCK_CODE) => getJson(`/analyze/${code}/recommendation`),
 }
