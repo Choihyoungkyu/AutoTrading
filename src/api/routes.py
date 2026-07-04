@@ -9,6 +9,7 @@ from src.analyzers.financial_analyzer import FinancialAnalyzer
 from src.analyzers.chart_analyzer import ChartAnalyzer
 from src.collectors.news_collector import NewsCollector
 from src.analyzers.news_analyzer import NewsAnalyzer
+from src.analyzers.recommendation_engine import RecommendationEngine
 
 api_bp = Blueprint("api", __name__)
 krx = KRXCollector()
@@ -18,6 +19,7 @@ financial_analyzer = FinancialAnalyzer(krx, yf)
 chart_analyzer = ChartAnalyzer(krx)
 news_collector = NewsCollector(krx)
 news_analyzer = NewsAnalyzer(news_collector)
+recommendation_engine = RecommendationEngine()
 
 DIST_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -171,4 +173,32 @@ def analyze_news(code):
         if cached:
             cached["source"] = "cache"
             return jsonify(cached)
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/analyze/<code>/recommendation")
+def analyze_recommendation(code):
+    # 재무·차트·뉴스 분석을 모아 정규화 후 종합 추천을 생성한다.
+    # 재무/뉴스는 캐시 우선, 차트는 매번 계산. 일부 분석이 없어도 중립(0.5)으로 진행한다.
+    try:
+        financial = store.load_financial(code) or financial_analyzer.analyze(code)
+        chart = chart_analyzer.analyze(code)
+        news = store.load_news(code) or news_analyzer.analyze(code)
+
+        if not (financial or chart or news):
+            return jsonify({"error": "No data found for code: " + code}), 404
+
+        fs = recommendation_engine.normalize_financial(financial) if financial else 0.5
+        cs = recommendation_engine.normalize_chart(chart) if chart else 0.5
+        ns = recommendation_engine.normalize_news(news) if news else 0.5
+
+        result = recommendation_engine.generate(fs, cs, ns)
+        result["code"] = code
+        result["available"] = {
+            "financial": bool(financial),
+            "chart": bool(chart),
+            "news": bool(news),
+        }
+        return jsonify(result)
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
