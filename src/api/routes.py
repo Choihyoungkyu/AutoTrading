@@ -47,6 +47,12 @@ def health():
     }), 200 if db_ok else 503
 
 
+@api_bp.route("/search")
+def search():
+    q = request.args.get("q", "").strip()
+    return jsonify(krx.search(q) if q else [])
+
+
 @api_bp.route("/api/stock/kr/<code>")
 def stock_kr(code):
     start = request.args.get("start")

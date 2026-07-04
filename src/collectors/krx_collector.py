@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
 NAVER_MAIN_URL = "https://finance.naver.com/item/main.naver"
+NAVER_AC_URL = "https://ac.stock.naver.com/ac"
 _HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 
@@ -34,6 +35,33 @@ class KRXCollector:
             return name or code
         except Exception:
             return code
+
+    def search(self, keyword: str, limit: int = 5) -> list:
+        # 종목 검색: 로그인 불필요한 네이버 자동완성 API 사용.
+        # 반환: [{"code","name","market"}] 상위 limit개. 실패 시 [].
+        try:
+            resp = requests.get(
+                NAVER_AC_URL,
+                params={"q": keyword, "target": "stock"},
+                headers=_HEADERS,
+                timeout=10,
+            )
+            resp.raise_for_status()
+            items = resp.json().get("items", [])
+        except (requests.RequestException, ValueError):
+            return []
+
+        results = []
+        for it in items[:limit]:
+            code = it.get("code")
+            if not code:
+                continue
+            results.append({
+                "code": code,
+                "name": it.get("name", code),
+                "market": it.get("typeName", ""),
+            })
+        return results
 
     def get_market_cap(self, code: str, date: str = None) -> dict:
         # KRX 재무 엔드포인트는 로그인을 요구(익명 요청에 400 LOGOUT)하므로,
