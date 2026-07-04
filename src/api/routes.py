@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request, send_from_directory
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from concurrent.futures import ThreadPoolExecutor
 import os
 import pandas as pd
 from src.collectors.krx_collector import KRXCollector
@@ -223,5 +224,71 @@ def analyze_price_target(code):
         result["code"] = code
         result["as_of"] = str(df["date"].iloc[-1])[:10]
         return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def _safe(fn):
+    # 부분 실패 허용: 한 분석이 실패해도 None으로 처리하고 나머지는 진행한다.
+    try:
+        return fn()
+    except Exception:
+        return None
+
+
+@api_bp.route("/analyze/<code>")
+def analyze_all(code):
+    # Primary Seam: 재무·차트·뉴스·추천·목표가를 한 번에 통합한다.
+    try:
+        # 1) 종목 유효성 검증 + 현재가 (OHLCV 1회 조회로 겸용)
+        df = _safe(lambda: krx.get_ohlcv(code))
+        if df is None or df.empty:
+            return jsonify({"error": "No data found for code: " + code}), 404
+
+        current_price = int(df["close"].iloc[-1])
+        as_of = str(df["date"].iloc[-1])[:10]
+
+        # 2) 재무·차트·뉴스를 병렬 실행 (재무·뉴스는 캐시 우선)
+        def get_financial():
+            return _ensure_as_of(code, store.load_financial(code) or financial_analyzer.analyze(code))
+
+        def get_chart():
+            return chart_analyzer.analyze(code)
+
+        def get_news():
+            return store.load_news(code) or news_analyzer.analyze(code)
+
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            financial = _safe(ex.submit(get_financial).result)
+            chart = _safe(ex.submit(get_chart).result)
+            news = _safe(ex.submit(get_news).result)
+
+        # 라이브 결과 캐시 저장 (idempotent, 다음 호출 5초 목표에 기여)
+        if financial:
+            store.save_financial(code, financial)
+        if news:
+            store.save_news(code, news)
+
+        # 3) 종합 추천 (없는 분석은 중립 0.5로 진행)
+        fs = recommendation_engine.normalize_financial(financial) if financial else 0.5
+        cs = recommendation_engine.normalize_chart(chart) if chart else 0.5
+        ns = recommendation_engine.normalize_news(news) if news else 0.5
+        recommendation = recommendation_engine.generate(fs, cs, ns)
+
+        # 4) 목표가·손절 (현재가 기반)
+        price_target = price_target_calculator.suggest(current_price)
+
+        return jsonify({
+            "stock_code": code,
+            "stock_name": krx.get_name(code),
+            "current_price": current_price,
+            "as_of": as_of,
+            "financial": financial,
+            "chart": chart,
+            "news": news,
+            "recommendation": recommendation,
+            "price_target": price_target,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
