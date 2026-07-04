@@ -17,4 +17,6 @@ export const api = {
   chart: (code = STOCK_CODE) => getJson(`/analyze/${code}/chart`),
   news: (code = STOCK_CODE) => getJson(`/analyze/${code}/news`),
   recommendation: (code = STOCK_CODE) => getJson(`/analyze/${code}/recommendation`),
+  priceTarget: (expectedReturn, maxLoss, code = STOCK_CODE) =>
+    getJson(`/analyze/${code}/price-target?expected_return=${expectedReturn}&max_loss=${maxLoss}`),
 }

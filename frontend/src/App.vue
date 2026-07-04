@@ -9,10 +9,12 @@ import FinancialAnalysis from './components/FinancialAnalysis.vue'
 import ChartAnalysis from './components/ChartAnalysis.vue'
 import NewsAnalysis from './components/NewsAnalysis.vue'
 import RecommendationAnalysis from './components/RecommendationAnalysis.vue'
+import PriceTargetCard from './components/PriceTargetCard.vue'
 import AppFooter from './components/AppFooter.vue'
 
 const tabs = [
   { key: 'recommendation', label: '🎯 종합 추천' },
+  { key: 'price-target', label: '🎚️ 목표가·손절' },
   { key: 'overview', label: '📈 개요' },
   { key: 'chart', label: '📉 주가 차트' },
   { key: 'financial', label: '💰 재무 분석' },
@@ -41,6 +43,7 @@ const active = ref('recommendation')
     <!-- keep-alive: 탭 전환 시 각 탭의 데이터/차트 상태를 보존(재요청 방지) -->
     <keep-alive>
       <RecommendationAnalysis v-if="active === 'recommendation'" key="recommendation" />
+      <PriceTargetCard v-else-if="active === 'price-target'" key="price-target" />
       <div v-else-if="active === 'overview'" key="overview">
         <div class="main">
           <KrxDataCard />
