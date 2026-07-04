@@ -15,4 +15,5 @@ export const api = {
     getJson(`/api/stock/kr/${code}/price-history?period=${period}`),
   financial: (code = STOCK_CODE) => getJson(`/analyze/${code}/financial`),
   chart: (code = STOCK_CODE) => getJson(`/analyze/${code}/chart`),
+  news: (code = STOCK_CODE) => getJson(`/analyze/${code}/news`),
 }
