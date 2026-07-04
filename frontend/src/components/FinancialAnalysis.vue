@@ -15,17 +15,22 @@ const verdictClass = computed(() => {
   const v = data.value?.verdict
   return 'verdict-' + (v === '저평가' ? 'undervalued' : v === '고평가' ? 'overvalued' : 'neutral')
 })
+
+// 업종/업계평균 조회 성공 여부. 실패 시 비교 대신 "조회 실패"를 표시한다.
+const hasIndustry = computed(() => !!data.value?.industry_avg)
+
 const perStatus = computed(() =>
-  data.value && data.value.per < data.value.industry_avg.per ? '✓ 저평가' : '✗ 고평가'
+  hasIndustry.value && data.value.per < data.value.industry_avg.per ? '✓ 저평가' : hasIndustry.value ? '✗ 고평가' : ''
 )
 const pbrStatus = computed(() =>
-  data.value && data.value.pbr < data.value.industry_avg.pbr ? '✓ 저평가' : '✗ 고평가'
+  hasIndustry.value && data.value.pbr < data.value.industry_avg.pbr ? '✓ 저평가' : hasIndustry.value ? '✗ 고평가' : ''
 )
 
 // 판정 근거 tooltip. SFC에서는 일반 JS 문자열이라 \n이 안전하게 개행으로 동작.
 const verdictBasis = computed(() => {
   const d = data.value
   if (!d) return ''
+  if (!hasIndustry.value) return '업종/업계평균을 불러오지 못해 저평가·고평가를 판정할 수 없습니다.'
   const perAvg = d.industry_avg.per
   const pbrAvg = d.industry_avg.pbr
   const perLow = d.per < perAvg
@@ -66,28 +71,28 @@ const verdictBasis = computed(() => {
           <div class="metric-label">PER (주가수익비율)</div>
           <div class="metric-value">{{ data.per.toFixed(1) }}</div>
           <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
-            업계평균: {{ data.industry_avg.per.toFixed(1) }} {{ perStatus }}
+            업계평균: {{ hasIndustry ? data.industry_avg.per.toFixed(1) + ' ' + perStatus : '조회 실패' }}
           </div>
         </div>
         <div class="metric-box">
           <div class="metric-label">PBR (주가순자산비율)</div>
           <div class="metric-value">{{ data.pbr.toFixed(2) }}</div>
           <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
-            업계평균: {{ data.industry_avg.pbr.toFixed(2) }} {{ pbrStatus }}
+            업계평균: {{ hasIndustry ? data.industry_avg.pbr.toFixed(2) + ' ' + pbrStatus : '조회 실패' }}
           </div>
         </div>
         <div class="metric-box">
           <div class="metric-label">ROE (자기자본수익률)</div>
           <div class="metric-value">{{ data.roe.toFixed(1) }}%</div>
           <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
-            업계평균: {{ data.industry_avg.roe.toFixed(1) }}%
+            업계평균: {{ hasIndustry ? data.industry_avg.roe.toFixed(1) + '%' : '조회 실패' }}
           </div>
         </div>
         <div class="metric-box">
           <div class="metric-label">배당수익률</div>
           <div class="metric-value">{{ data.dividend_yield.toFixed(2) }}%</div>
           <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
-            업계평균: {{ data.industry_avg.dividend_yield.toFixed(2) }}%
+            업계평균: {{ hasIndustry ? data.industry_avg.dividend_yield.toFixed(2) + '%' : '조회 실패' }}
           </div>
         </div>
       </div>
@@ -102,12 +107,15 @@ const verdictBasis = computed(() => {
           </div>
         </div>
         <div class="comparison-card">
-          <div class="comparison-title">🏭 반도체 업계 평균</div>
+          <div class="comparison-title">🏭 {{ hasIndustry ? data.industry_name + ' 업계 평균' : '업계 평균' }}</div>
           <div style="font-size: 12px; color: #7f8c8d;">
-            <div>4개사 (SK하이닉스, DB하이텍, 주성엔지니어링, 원익IPS)</div>
-            <div style="margin-top: 8px; color: #495057;">
-              PER: {{ data.industry_avg.per.toFixed(1) }} | PBR: {{ data.industry_avg.pbr.toFixed(2) }}
-            </div>
+            <template v-if="hasIndustry">
+              <div>동일업종 {{ data.industry_avg.peer_count }}개사 중앙값</div>
+              <div style="margin-top: 8px; color: #495057;">
+                PER: {{ data.industry_avg.per.toFixed(1) }} | PBR: {{ data.industry_avg.pbr.toFixed(2) }}
+              </div>
+            </template>
+            <div v-else style="color: #e74c3c;">조회 실패</div>
           </div>
         </div>
       </div>

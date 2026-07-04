@@ -31,7 +31,7 @@ function scoreTag(score) {
 
 <template>
   <div class="card">
-    <h2>📰 뉴스 분석 (이슈 004)</h2>
+    <h2>📰 뉴스 분석</h2>
     <div v-if="error" class="error">뉴스 로드 실패: {{ error }}</div>
     <div v-else-if="loading || !data" class="loading">뉴스 수집 중...</div>
     <div v-else>

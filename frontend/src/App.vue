@@ -1,6 +1,7 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import AppHeader from './components/AppHeader.vue'
+import HomeView from './components/HomeView.vue'
 import KrxDataCard from './components/KrxDataCard.vue'
 import DbStatusCard from './components/DbStatusCard.vue'
 import PriceDataTable from './components/PriceDataTable.vue'
@@ -11,21 +12,28 @@ import NewsAnalysis from './components/NewsAnalysis.vue'
 import RecommendationAnalysis from './components/RecommendationAnalysis.vue'
 import PriceTargetCard from './components/PriceTargetCard.vue'
 import AppFooter from './components/AppFooter.vue'
+import { currentCode } from './composables/useCurrentStock.js'
 
 const tabs = [
-  { key: 'recommendation', label: '🎯 종합 추천' },
-  { key: 'price-target', label: '🎚️ 목표가·손절' },
   { key: 'overview', label: '📈 개요' },
   { key: 'chart', label: '📉 주가 차트' },
   { key: 'financial', label: '💰 재무 분석' },
   { key: 'technical', label: '📐 기술적 분석' },
   { key: 'news', label: '📰 뉴스' },
+  { key: 'price-target', label: '🎚️ 목표가·손절' },
+  { key: 'recommendation', label: '🎯 종합 추천' },
 ]
-const active = ref('recommendation')
+const active = ref('overview')
+
+// 종목을 검색/변경하면 항상 개요 탭부터 보여준다.
+watch(currentCode, () => { active.value = 'overview' })
 </script>
 
 <template>
   <div class="container">
+    <HomeView v-if="!currentCode" />
+
+    <template v-else>
     <AppHeader />
 
     <nav class="tabs">
@@ -58,5 +66,6 @@ const active = ref('recommendation')
     </keep-alive>
 
     <AppFooter />
+    </template>
   </div>
 </template>

@@ -10,10 +10,12 @@ export const STOCK_CODE = '005930'
 
 export const api = {
   health: () => getJson('/api/health'),
+  indices: () => getJson('/api/indices'),
+  quote: (code) => getJson(`/api/quote/${code}`),
   search: (q) => getJson(`/search?q=${encodeURIComponent(q)}`),
   krxStock: (code = STOCK_CODE) => getJson(`/api/stock/kr/${code}`),
-  priceHistory: (period, code = STOCK_CODE) =>
-    getJson(`/api/stock/kr/${code}/price-history?period=${period}`),
+  priceHistory: (period, code = STOCK_CODE, interval = 'day') =>
+    getJson(`/api/stock/kr/${code}/price-history?period=${period}&interval=${interval}`),
   financial: (code = STOCK_CODE) => getJson(`/analyze/${code}/financial`),
   chart: (code = STOCK_CODE) => getJson(`/analyze/${code}/chart`),
   news: (code = STOCK_CODE) => getJson(`/analyze/${code}/news`),

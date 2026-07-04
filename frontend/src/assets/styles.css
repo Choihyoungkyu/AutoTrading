@@ -45,7 +45,8 @@ header p { font-size: 14px; opacity: 0.9; }
 .indicator-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
 .ind-btn { padding: 4px 12px; border-radius: 20px; border: 2px solid; background: white; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.15s; }
 .ind-btn.active { color: white !important; }
-.price-chart-wrap { position: relative; height: 250px; margin-top: 8px; }
+.chart-hint { font-size: 11px; color: #95a5a6; margin-top: 4px; }
+.price-chart-wrap { position: relative; height: 250px; margin-top: 8px; touch-action: none; }
 
 /* 종목 검색 */
 .search-box { position: relative; margin-top: 15px; max-width: 420px; }
@@ -163,4 +164,67 @@ header p { font-size: 14px; opacity: 0.9; }
     .data-table td:nth-child(2),
     .data-table td:nth-child(3),
     .data-table td:nth-child(4) { font-size: 11px; }
+}
+
+/* --- 헤더 상단(홈 버튼 + 제목) --- */
+.header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.header-top h1 { margin-bottom: 0; }
+.home-btn { background: rgba(255,255,255,0.15); color: white; border: none; border-radius: 6px;
+  padding: 8px 12px; min-height: 44px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.home-btn:hover { background: rgba(255,255,255,0.28); }
+
+/* --- 홈 화면 --- */
+.home-hero { background: #2c3e50; color: white; padding: 28px 16px; border-radius: 8px;
+  margin-bottom: 20px; text-align: center; }
+.home-hero h1 { font-size: 22px; margin-bottom: 8px; }
+.home-hero p { font-size: 14px; opacity: 0.9; margin-bottom: 18px; }
+.home-hero .search-box { margin: 0 auto; }
+
+/* --- 지수 그리드 --- */
+.indices-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.index-card { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-left: 4px solid #95a5a6; }
+.index-card.up { border-left-color: #e74c3c; }
+.index-card.down { border-left-color: #3498db; }
+.index-name { font-size: 13px; color: #7f8c8d; font-weight: 600; margin-bottom: 6px; }
+.index-price { font-size: 22px; font-weight: 700; color: #2c3e50; }
+.index-price.muted { color: #bdc3c7; }
+.index-change { font-size: 13px; font-weight: 600; margin-top: 4px; color: #95a5a6; }
+.index-card.up .index-change { color: #e74c3c; }
+.index-card.down .index-change { color: #3498db; }
+.indices-msg { padding: 20px; text-align: center; color: #7f8c8d; }
+.indices-msg.error { color: #e74c3c; }
+
+/* --- 관심 종목 하트 버튼 --- */
+.fav-btn { background: transparent; border: none; cursor: pointer; font-size: 16px;
+  line-height: 1; padding: 4px; min-height: 32px; min-width: 32px; }
+
+/* --- 관심 종목 패널(홈) --- */
+.watchlist { margin-top: 20px; }
+.watchlist-title { color: #2c3e50; font-size: 16px; margin-bottom: 10px; }
+.watchlist-empty { background: white; border-radius: 8px; padding: 16px; color: #7f8c8d;
+  font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.watchlist-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.watch-item { display: flex; align-items: baseline; gap: 10px; text-align: left; width: 100%;
+  background: white; border: none; border-left: 4px solid #95a5a6; border-radius: 8px;
+  padding: 12px 14px; min-height: 44px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.watch-item:hover { background: #f0f4f8; }
+.watch-item.up { border-left-color: #e74c3c; }
+.watch-item.down { border-left-color: #3498db; }
+.watch-name { font-size: 14px; font-weight: 600; color: #2c3e50; flex: 1 1 auto; }
+.watch-price { font-size: 14px; font-weight: 700; color: #2c3e50; }
+.watch-rate { font-size: 13px; font-weight: 600; color: #95a5a6; flex: 0 0 auto; min-width: 64px; text-align: right; }
+.watch-rate.muted { color: #bdc3c7; }
+.watch-item.up .watch-rate { color: #e74c3c; }
+.watch-item.down .watch-rate { color: #3498db; }
+
+@media (min-width: 768px) {
+  .home-hero { padding: 40px 20px; }
+  .home-hero h1 { font-size: 28px; }
+  .indices-grid { grid-template-columns: repeat(3, 1fr); }
+  .watchlist-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1024px) {
+  .indices-grid { grid-template-columns: repeat(5, 1fr); }
+  .watchlist-grid { grid-template-columns: repeat(3, 1fr); }
 }

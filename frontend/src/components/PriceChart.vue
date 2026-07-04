@@ -1,14 +1,20 @@
 <script setup>
 import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue'
 import Chart from 'chart.js/auto'
+import zoomPlugin from 'chartjs-plugin-zoom'
+import Hammer from 'hammerjs'
 import { api } from '../api/client.js'
 import { currentCode, currentName } from '../composables/useCurrentStock.js'
 
-const PERIODS = [
-  { key: '1d', label: '일' },
-  { key: '1w', label: '주' },
-  { key: '1m', label: '달' },
-  { key: '1y', label: '년' },
+// 터치 핀치 줌을 위해 Hammer를 전역에 노출(chartjs-plugin-zoom이 참조)
+if (typeof window !== 'undefined' && !window.Hammer) window.Hammer = Hammer
+Chart.register(zoomPlugin)
+
+const INTERVALS = [
+  { key: 'day', label: '일별' },
+  { key: 'week', label: '주간' },
+  { key: 'month', label: '월별' },
+  { key: 'year', label: '연도별' },
 ]
 
 const INDICATORS = [
@@ -18,7 +24,10 @@ const INDICATORS = [
   { key: 'bb', label: '볼린저밴드', color: '#9b59b6', tooltip: '이동평균을 중심으로 표준편차 범위의 밴드. 가격 변동성과 과매수/과매도를 나타냄' },
 ]
 
-const period = ref('1m')
+// 초기 화면에 보여줄 최근 거래일 수(축소하면 과거 전체까지 표시)
+const INITIAL_WINDOW = 120
+
+const interval = ref('day')
 const active = reactive({ ma5: false, ma20: true, ma60: false, bb: false })
 const asof = ref('')
 const errorMsg = ref('')
@@ -26,6 +35,7 @@ const errorMsg = ref('')
 const canvas = ref(null)
 let chartInstance = null
 let chartData = null
+let savedWindow = null   // 지표 토글 시 확대/이동 상태 보존용 {min, max}
 
 function indStyle(ind) {
   return active[ind.key]
@@ -35,7 +45,10 @@ function indStyle(ind) {
 
 function toggleIndicator(key) {
   active[key] = !active[key]
-  if (chartData) renderChart()
+  if (!chartData) return
+  // 지표만 켜고 끌 때는 현재 확대/이동 상태를 유지한다.
+  if (chartInstance) savedWindow = { min: chartInstance.scales.x.min, max: chartInstance.scales.x.max }
+  renderChart()
 }
 
 function buildDatasets() {
@@ -52,7 +65,7 @@ function buildDatasets() {
       return gradient
     })(),
     borderWidth: 2,
-    pointRadius: rows.length > 60 ? 0 : 2,
+    pointRadius: 0,
     fill: true,
     tension: 0.1,
   }]
@@ -96,11 +109,18 @@ function buildDatasets() {
   return datasets
 }
 
+function applyWindow(len) {
+  // 지표 토글로 재생성된 경우 직전 확대/이동 상태를 복원, 아니면 최근 구간을 기본 표시
+  const range = savedWindow || { min: Math.max(0, len - INITIAL_WINDOW), max: len - 1 }
+  chartInstance.zoomScale('x', range, 'none')
+}
+
 function renderChart() {
   const rows = chartData.data
   const labels = rows.map((d) => d.date)
-  asof.value = rows.length ? '기준일: ' + rows[rows.length - 1].date : ''
+  asof.value = rows.length ? '기준일: ' + rows[rows.length - 1].date + ` · 총 ${rows.length}거래일` : ''
 
+  // savedWindow(지표 토글 시 설정)가 있으면 그 범위를, 없으면 최근 구간을 표시
   if (chartInstance) chartInstance.destroy()
   chartInstance = new Chart(canvas.value.getContext('2d'), {
     type: 'line',
@@ -108,6 +128,7 @@ function renderChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true },
@@ -116,6 +137,15 @@ function renderChart() {
             label: (ctx) =>
               ctx.dataset.label + ': ₩' + (ctx.parsed.y ? ctx.parsed.y.toLocaleString() : 'N/A'),
           },
+        },
+        zoom: {
+          pan: { enabled: true, mode: 'x' },
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: 'x',
+          },
+          limits: { x: { minRange: 5 } },
         },
       },
       scales: {
@@ -129,27 +159,34 @@ function renderChart() {
       },
     },
   })
+  applyWindow(labels.length)
 }
 
-async function loadPriceChart(p) {
-  period.value = p
+function selectInterval(key) {
+  if (interval.value === key) return
+  interval.value = key
+  loadPriceChart()
+}
+
+async function loadPriceChart() {
   errorMsg.value = ''
   try {
-    const data = await api.priceHistory(p, currentCode.value)
+    const data = await api.priceHistory('all', currentCode.value, interval.value)
     if (data.error) {
       errorMsg.value = data.error
       return
     }
     chartData = data
+    savedWindow = null   // 새 종목·새 간격은 최근 구간부터 표시
     renderChart()
   } catch (e) {
     errorMsg.value = '차트 로드 실패: ' + e.message
   }
 }
 
-onMounted(() => loadPriceChart('1m'))
-// 종목 변경 시 현재 기간으로 재조회
-watch(currentCode, () => loadPriceChart(period.value))
+onMounted(loadPriceChart)
+// 종목 변경 시 재조회
+watch(currentCode, loadPriceChart)
 onBeforeUnmount(() => {
   if (chartInstance) chartInstance.destroy()
 })
@@ -160,13 +197,13 @@ onBeforeUnmount(() => {
     <h2>📉 주가 차트 ({{ currentName }} {{ currentCode }})</h2>
     <div class="period-buttons">
       <button
-        v-for="p in PERIODS"
-        :key="p.key"
+        v-for="iv in INTERVALS"
+        :key="iv.key"
         class="period-btn"
-        :class="{ active: period === p.key }"
-        @click="loadPriceChart(p.key)"
+        :class="{ active: interval === iv.key }"
+        @click="selectInterval(iv.key)"
       >
-        {{ p.label }}
+        {{ iv.label }}
       </button>
     </div>
     <div class="indicator-filters">
@@ -182,7 +219,8 @@ onBeforeUnmount(() => {
         {{ ind.label }}
       </button>
     </div>
-    <div style="font-size:12px;color:#7f8c8d;margin-top:8px;">{{ asof }}</div>
+    <div class="chart-hint">💡 마우스 휠(또는 핀치)로 확대·축소, 드래그로 기간 이동</div>
+    <div style="font-size:12px;color:#7f8c8d;margin-top:4px;">{{ asof }}</div>
     <div class="price-chart-wrap">
       <canvas ref="canvas"></canvas>
     </div>

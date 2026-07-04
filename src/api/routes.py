@@ -5,6 +5,7 @@ import os
 import pandas as pd
 from src.collectors.krx_collector import KRXCollector
 from src.collectors.yfinance_collector import YFinanceCollector
+from src.collectors.index_collector import IndexCollector
 from src.storage.data_store import DataStore
 from src.analyzers.financial_analyzer import FinancialAnalyzer
 from src.analyzers.chart_analyzer import ChartAnalyzer
@@ -23,6 +24,7 @@ news_collector = NewsCollector(krx)
 news_analyzer = NewsAnalyzer(news_collector)
 recommendation_engine = RecommendationEngine()
 price_target_calculator = PriceTargetCalculator()
+index_collector = IndexCollector()
 
 DIST_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -53,6 +55,21 @@ def search():
     return jsonify(krx.search(q) if q else [])
 
 
+@api_bp.route("/api/indices")
+def indices():
+    # 홈 화면용 주요 지수(코스피·코스닥·나스닥·S&P500·다우) 가격·등락률
+    return jsonify(index_collector.get_indices())
+
+
+@api_bp.route("/api/quote/<code>")
+def quote(code):
+    # 관심 종목 목록용 경량 시세(현재가·등락률)
+    q = krx.get_quote(code)
+    if not q:
+        return jsonify({"error": "No quote for code: " + code}), 404
+    return jsonify(q)
+
+
 @api_bp.route("/api/stock/kr/<code>")
 def stock_kr(code):
     start = request.args.get("start")
@@ -73,10 +90,12 @@ def stock_kr(code):
 
 @api_bp.route("/api/stock/kr/<code>/price-history")
 def stock_kr_price_history(code):
-    period = request.args.get("period", "1m")
+    period = request.args.get("period", "all")
+    interval = request.args.get("interval", "day")
     today = datetime.now()
-    days_map = {"1d": 30, "1w": 91, "1m": 365, "1y": 1095}
-    days = days_map.get(period, 365)
+    # all = 전체 히스토리(pykrx 최대 약 3000거래일). 나머지는 lookback 일수.
+    days_map = {"1d": 30, "1w": 91, "1m": 365, "1y": 1095, "all": 8000}
+    days = days_map.get(period, 8000)
     start = (today - timedelta(days=days)).strftime("%Y%m%d")
     end = today.strftime("%Y%m%d")
     try:
@@ -84,6 +103,18 @@ def stock_kr_price_history(code):
         if df.empty:
             return jsonify({"error": "No data found for code: " + code}), 404
 
+        # 캔들 간격 리샘플링: 주간/월별/연도별은 기간 내 종가(마지막)를 대표값으로.
+        rule = {"week": "W", "month": "ME", "year": "YE"}.get(interval)
+        if rule:
+            idx = pd.to_datetime(df["date"])
+            agg = df.set_index(idx).resample(rule).agg(
+                {"open": "first", "high": "max", "low": "min",
+                 "close": "last", "volume": "sum"}
+            ).dropna(subset=["close"])
+            agg["date"] = agg.index.strftime("%Y-%m-%d")
+            df = agg.reset_index(drop=True)
+
+        # 이동평균·볼린저밴드는 (리샘플된) 캔들 기준으로 계산
         df['ma5']  = df['close'].rolling(5).mean().round(0)
         df['ma20'] = df['close'].rolling(20).mean().round(0)
         df['ma60'] = df['close'].rolling(60).mean().round(0)
@@ -100,6 +131,7 @@ def stock_kr_price_history(code):
         return jsonify({
             "code": code,
             "period": period,
+            "interval": interval,
             "count": len(df),
             "data": data
         })
