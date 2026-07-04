@@ -1,7 +1,8 @@
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue'
 import Chart from 'chart.js/auto'
 import { api } from '../api/client.js'
+import { currentCode, currentName } from '../composables/useCurrentStock.js'
 
 const PERIODS = [
   { key: '1d', label: '일' },
@@ -134,7 +135,7 @@ async function loadPriceChart(p) {
   period.value = p
   errorMsg.value = ''
   try {
-    const data = await api.priceHistory(p)
+    const data = await api.priceHistory(p, currentCode.value)
     if (data.error) {
       errorMsg.value = data.error
       return
@@ -147,6 +148,8 @@ async function loadPriceChart(p) {
 }
 
 onMounted(() => loadPriceChart('1m'))
+// 종목 변경 시 현재 기간으로 재조회
+watch(currentCode, () => loadPriceChart(period.value))
 onBeforeUnmount(() => {
   if (chartInstance) chartInstance.destroy()
 })
@@ -154,7 +157,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="card">
-    <h2>📉 주가 차트 (삼성전자 005930)</h2>
+    <h2>📉 주가 차트 ({{ currentName }} {{ currentCode }})</h2>
     <div class="period-buttons">
       <button
         v-for="p in PERIODS"

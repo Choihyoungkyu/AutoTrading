@@ -1,15 +1,17 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useAsyncData } from '../composables/useAsyncData.js'
 import { api } from '../api/client.js'
+import { currentCode } from '../composables/useCurrentStock.js'
 
 const expectedReturn = ref(0.15)
 const maxLoss = ref(0.10)
 
 const { data, error, loading, load } = useAsyncData(
-  () => api.priceTarget(expectedReturn.value, maxLoss.value)
+  () => api.priceTarget(expectedReturn.value, maxLoss.value, currentCode.value)
 )
 onMounted(load)
+watch(currentCode, load)
 
 function pct(v) { return Math.round(v * 100) }
 function won(v) { return v != null ? v.toLocaleString() + '원' : '-' }

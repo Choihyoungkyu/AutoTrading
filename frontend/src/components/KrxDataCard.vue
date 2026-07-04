@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useKrxStock } from '../composables/useStock.js'
+import { currentCode, currentName } from '../composables/useCurrentStock.js'
 
 const { data, error, loading, ensureLoaded } = useKrxStock()
 onMounted(ensureLoaded)
@@ -21,12 +22,12 @@ const volM = (v) => (v / 1000000).toFixed(1) + 'M'
 <template>
   <div class="card">
     <h2>🇰🇷 국내 주식 데이터 (PYKRX)</h2>
-    <p>삼성전자 (005930)</p>
+    <p>{{ currentName }} ({{ currentCode }})</p>
     <div v-if="error" class="error">오류: {{ error }}</div>
     <div v-else-if="loading || !latest" class="loading">데이터 로드 중...</div>
     <div v-else style="display: grid; gap: 12px; margin-top: 15px;">
-      <div><strong>종목명:</strong> 삼성전자</div>
-      <div><strong>코드:</strong> 005930</div>
+      <div><strong>종목명:</strong> {{ currentName }}</div>
+      <div><strong>코드:</strong> {{ currentCode }}</div>
       <div>
         <strong>현재가:</strong>
         <span style="font-size: 24px; font-weight: bold;">{{ fmt(latest.close) }}</span> ₩

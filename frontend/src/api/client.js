@@ -10,6 +10,7 @@ export const STOCK_CODE = '005930'
 
 export const api = {
   health: () => getJson('/api/health'),
+  search: (q) => getJson(`/search?q=${encodeURIComponent(q)}`),
   krxStock: (code = STOCK_CODE) => getJson(`/api/stock/kr/${code}`),
   priceHistory: (period, code = STOCK_CODE) =>
     getJson(`/api/stock/kr/${code}/price-history?period=${period}`),

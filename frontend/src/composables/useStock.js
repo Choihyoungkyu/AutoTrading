@@ -1,5 +1,6 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { api } from '../api/client.js'
+import { currentCode } from './useCurrentStock.js'
 
 // 여러 컴포넌트가 같은 엔드포인트를 공유하므로(예: 현재가 카드 + 시세 표),
 // 모듈 레벨 싱글턴으로 만들어 중복 호출을 막는다.
@@ -45,8 +46,10 @@ export function useHealth() {
   return health
 }
 
-// /api/stock/kr/005930 — 현재가 카드 + 최근 시세 표 공용
-const krxStock = createResource(() => api.krxStock())
+// /api/stock/kr/<code> — 현재가 카드 + 최근 시세 표 공용
+const krxStock = createResource(() => api.krxStock(currentCode.value))
+// 종목 변경 시 공유 싱글턴을 재조회(KrxDataCard·PriceDataTable 동시 갱신)
+watch(currentCode, () => krxStock.load())
 export function useKrxStock() {
   return krxStock
 }

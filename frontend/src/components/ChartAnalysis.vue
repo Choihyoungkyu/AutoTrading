@@ -1,10 +1,12 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useAsyncData } from '../composables/useAsyncData.js'
 import { api } from '../api/client.js'
+import { currentCode } from '../composables/useCurrentStock.js'
 
-const { data, error, loading, load } = useAsyncData(() => api.chart())
+const { data, error, loading, load } = useAsyncData(() => api.chart(currentCode.value))
 onMounted(load)
+watch(currentCode, load)
 
 const signalColor = computed(() => {
   const s = data.value?.signal

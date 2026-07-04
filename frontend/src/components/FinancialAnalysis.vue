@@ -1,10 +1,12 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useAsyncData } from '../composables/useAsyncData.js'
 import { api } from '../api/client.js'
+import { currentCode, currentName } from '../composables/useCurrentStock.js'
 
-const { data, error, loading, load } = useAsyncData(() => api.financial())
+const { data, error, loading, load } = useAsyncData(() => api.financial(currentCode.value))
 onMounted(load)
+watch(currentCode, load)
 
 // 기준일(as_of)이 없으면 신뢰할 수 없는 데이터로 보고 표시하지 않는다.
 const hasAsOf = computed(() => !!data.value?.as_of)
@@ -92,7 +94,7 @@ const verdictBasis = computed(() => {
 
       <div class="comparison">
         <div class="comparison-card">
-          <div class="comparison-title">📊 삼성전자 재무지표</div>
+          <div class="comparison-title">📊 {{ currentName }} 재무지표</div>
           <div style="font-size: 12px; line-height: 1.8; color: #495057;">
             <div>EPS: {{ data.eps.toLocaleString() }}원</div>
             <div>BPS: {{ data.bps.toLocaleString() }}원</div>

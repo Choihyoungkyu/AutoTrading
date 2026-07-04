@@ -1,10 +1,12 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useAsyncData } from '../composables/useAsyncData.js'
 import { api } from '../api/client.js'
+import { currentCode } from '../composables/useCurrentStock.js'
 
-const { data, error, loading, load } = useAsyncData(() => api.recommendation())
+const { data, error, loading, load } = useAsyncData(() => api.recommendation(currentCode.value))
 onMounted(load)
+watch(currentCode, load)
 
 const gradeLabel = computed(() => {
   const g = data.value?.grade

@@ -1,10 +1,12 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAsyncData } from '../composables/useAsyncData.js'
 import { api } from '../api/client.js'
+import { currentCode } from '../composables/useCurrentStock.js'
 
-const { data, error, loading, load } = useAsyncData(() => api.news())
+const { data, error, loading, load } = useAsyncData(() => api.news(currentCode.value))
 onMounted(load)
+watch(currentCode, load)
 
 const sentimentLabel = computed(() => {
   const s = data.value?.sentiment
