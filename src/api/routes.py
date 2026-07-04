@@ -10,6 +10,7 @@ from src.analyzers.chart_analyzer import ChartAnalyzer
 from src.collectors.news_collector import NewsCollector
 from src.analyzers.news_analyzer import NewsAnalyzer
 from src.analyzers.recommendation_engine import RecommendationEngine
+from src.analyzers.price_target_calculator import PriceTargetCalculator
 
 api_bp = Blueprint("api", __name__)
 krx = KRXCollector()
@@ -20,6 +21,7 @@ chart_analyzer = ChartAnalyzer(krx)
 news_collector = NewsCollector(krx)
 news_analyzer = NewsAnalyzer(news_collector)
 recommendation_engine = RecommendationEngine()
+price_target_calculator = PriceTargetCalculator()
 
 DIST_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -199,6 +201,27 @@ def analyze_recommendation(code):
             "chart": bool(chart),
             "news": bool(news),
         }
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/analyze/<code>/price-target")
+def analyze_price_target(code):
+    # 현재가(PYKRX 최신 종가) 기반 목표가·손절가 제안.
+    # expected_return / max_loss는 쿼리로 조절 (기본 15% / 10%).
+    try:
+        expected_return = float(request.args.get("expected_return", 0.15))
+        max_loss = float(request.args.get("max_loss", 0.10))
+
+        df = krx.get_ohlcv(code)
+        if df.empty:
+            return jsonify({"error": "No data found for code: " + code}), 404
+
+        current_price = int(df["close"].iloc[-1])
+        result = price_target_calculator.suggest(current_price, expected_return, max_loss)
+        result["code"] = code
+        result["as_of"] = str(df["date"].iloc[-1])[:10]
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
