@@ -7,13 +7,17 @@ from src.collectors.yfinance_collector import YFinanceCollector
 from src.storage.data_store import DataStore
 from src.analyzers.financial_analyzer import FinancialAnalyzer
 from src.analyzers.chart_analyzer import ChartAnalyzer
+from src.collectors.news_collector import NewsCollector
+from src.analyzers.news_analyzer import NewsAnalyzer
 
 api_bp = Blueprint("api", __name__)
 krx = KRXCollector()
 yf = YFinanceCollector()
 store = DataStore()
 financial_analyzer = FinancialAnalyzer(krx, yf)
-chart_analyzer = ChartAnalyzer(yf)
+chart_analyzer = ChartAnalyzer(krx)
+news_collector = NewsCollector(krx)
+news_analyzer = NewsAnalyzer(news_collector)
 
 DIST_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -146,4 +150,25 @@ def analyze_chart(code):
             return jsonify({"error": "No data found for code: " + code}), 404
         return jsonify(result)
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/analyze/<code>/news")
+def analyze_news(code):
+    # 실시간 수집 성공 시 캐시에 저장, 실패(빈 결과·예외) 시 캐시로 폴백한다.
+    try:
+        result = news_analyzer.analyze(code)
+        if result:
+            store.save_news(code, result)
+            return jsonify(result)
+        cached = store.load_news(code)
+        if cached:
+            cached["source"] = "cache"
+            return jsonify(cached)
+        return jsonify({"error": "No news found for code: " + code}), 404
+    except Exception as e:
+        cached = store.load_news(code)
+        if cached:
+            cached["source"] = "cache"
+            return jsonify(cached)
         return jsonify({"error": str(e)}), 500

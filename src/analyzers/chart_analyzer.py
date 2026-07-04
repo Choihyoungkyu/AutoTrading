@@ -1,17 +1,23 @@
 import pandas as pd
-from src.collectors.yfinance_collector import YFinanceCollector
+from datetime import datetime, timedelta
+from src.collectors.krx_collector import KRXCollector
 from ta.momentum import RSIIndicator
 from ta.trend import MACD
 from ta.volatility import BollingerBands
 
 
 class ChartAnalyzer:
-    def __init__(self, yfinance_collector: YFinanceCollector = None):
-        self.yf = yfinance_collector or YFinanceCollector()
+    def __init__(self, krx_collector: KRXCollector = None):
+        self.krx = krx_collector or KRXCollector()
 
     def analyze(self, code: str) -> dict:
         """주식 종목의 기술적 분석 수행 (MA, RSI, MACD, 볼린저밴드)"""
-        df = self.yf.get_ohlcv(f"{code}.KS", period="1y")
+        # 국내 시세는 다른 섹션과 동일하게 PYKRX로 조회한다.
+        # 지표 계산에 최소 50거래일이 필요하므로 약 1년(주말/휴장 포함 400일)을 요청한다.
+        today = datetime.today()
+        start = (today - timedelta(days=400)).strftime("%Y%m%d")
+        end = today.strftime("%Y%m%d")
+        df = self.krx.get_ohlcv(code, start=start, end=end)
         if df is None or df.empty:
             return None
 

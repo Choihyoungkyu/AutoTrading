@@ -84,3 +84,32 @@ class DataStore:
                     (code,)
                 ).fetchone()
         return json.loads(row[0]) if row else None
+
+    def _ensure_news_cache_table(self, conn):
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS news_cache "
+            "(code TEXT, date TEXT, data TEXT, PRIMARY KEY (code, date))"
+        )
+
+    def save_news(self, code: str, data: dict) -> None:
+        with self._connect() as conn:
+            self._ensure_news_cache_table(conn)
+            conn.execute(
+                "INSERT OR REPLACE INTO news_cache VALUES (?, ?, ?)",
+                (code, str(date.today()), json.dumps(data))
+            )
+
+    def load_news(self, code: str) -> dict | None:
+        with self._connect() as conn:
+            self._ensure_news_cache_table(conn)
+            row = conn.execute(
+                "SELECT data FROM news_cache WHERE code=? AND date=?",
+                (code, str(date.today()))
+            ).fetchone()
+            if row is None:
+                # 뉴스 수집 실패 시 가장 최근 캐시로 폴백(PRD: 크롤링 실패가 장애로 이어지지 않게).
+                row = conn.execute(
+                    "SELECT data FROM news_cache WHERE code=? ORDER BY date DESC LIMIT 1",
+                    (code,)
+                ).fetchone()
+        return json.loads(row[0]) if row else None

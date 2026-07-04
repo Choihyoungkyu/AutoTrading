@@ -27,6 +27,14 @@ class KRXCollector:
         df["code"] = code
         return df
 
+    def get_name(self, code: str) -> str:
+        # 구글 뉴스 검색 쿼리용 종목명. 실패 시 코드를 그대로 반환한다.
+        try:
+            name = stock.get_market_ticker_name(code)
+            return name or code
+        except Exception:
+            return code
+
     def get_market_cap(self, code: str, date: str = None) -> dict:
         # KRX 재무 엔드포인트는 로그인을 요구(익명 요청에 400 LOGOUT)하므로,
         # 로그인이 필요 없는 네이버 금융 종목 페이지에서 최신 PER/PBR/EPS/BPS/
