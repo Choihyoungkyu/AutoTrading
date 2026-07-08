@@ -1,14 +1,14 @@
 <script setup>
 import { ref, watchEffect } from 'vue'
-import { api, STOCK_CODE } from '../api/client'
+import { api } from '../api/client'
+import { currentCode } from '../composables/useCurrentStock.js'
 
-const props = defineProps({ code: { type: String, default: STOCK_CODE } })
 const data = ref(null)
 const error = ref('')
 
 watchEffect(async () => {
   data.value = null; error.value = ''
-  try { data.value = await api.explain(props.code) }
+  try { data.value = await api.explain(currentCode.value) }
   catch (e) { error.value = '상태 설명을 불러오지 못했습니다.' }
 })
 
