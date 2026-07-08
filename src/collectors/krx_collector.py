@@ -1,3 +1,8 @@
+from dotenv import load_dotenv
+
+# pykrx 1.2.8은 import 시점에 KRX_ID/KRX_PW로 로그인한다. pykrx보다 먼저 .env 로드.
+load_dotenv()
+
 from pykrx import stock
 import pandas as pd
 import re
@@ -10,6 +15,7 @@ NAVER_COINFO_URL = "https://finance.naver.com/item/coinfo.naver"
 NAVER_GROUP_URL = "https://finance.naver.com/sise/sise_group_detail.naver"
 NAVER_QUANT_URL = "https://finance.naver.com/sise/sise_quant.naver"
 NAVER_AC_URL = "https://ac.stock.naver.com/ac"
+NAVER_MOBILE_INTEGRATION = "https://m.stock.naver.com/api/stock/{}/integration"
 _HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 
@@ -269,6 +275,34 @@ class KRXCollector:
             return None
         text = re.sub(r"^기업개요\s*", "", el.get_text(" ", strip=True))
         return text or None
+
+    def get_consensus_target(self, code: str) -> dict:
+        # 증권사 컨센서스: 네이버 모바일 API의 평균 목표주가·평균 투자의견.
+        # 애널리스트 커버리지가 없는 종목은 consensusInfo가 없어 None을 반환한다.
+        try:
+            resp = requests.get(NAVER_MOBILE_INTEGRATION.format(code), headers=_HEADERS, timeout=8)
+            resp.raise_for_status()
+            info = (resp.json() or {}).get("consensusInfo")
+        except (requests.RequestException, ValueError):
+            return None
+        if not info:
+            return None
+
+        def _to_num(v):
+            try:
+                return float(str(v).replace(",", ""))
+            except (TypeError, ValueError):
+                return None
+
+        target = _to_num(info.get("priceTargetMean"))
+        recomm = _to_num(info.get("recommMean"))
+        if not target or target <= 0:
+            return None
+        return {
+            "target_price": round(target),
+            "recomm_mean": round(recomm, 2) if recomm is not None else None,
+            "as_of": info.get("createDate"),
+        }
 
     def get_naver_financials(self, code: str) -> dict:
         # 네이버 '기업실적분석' 테이블에서 연간 매출·이익·이익률·유보율·부채비율을 파싱.

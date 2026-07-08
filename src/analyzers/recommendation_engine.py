@@ -1,6 +1,8 @@
 # 재무(평가) + 차트(기술) + 뉴스(심리) 세 관점을 가중 합산해
 # 최종 Buy/Hold/Sell 신호를 만든다.
-WEIGHTS = {"financial": 0.3, "chart": 0.4, "news": 0.3}
+# 재무·차트는 팩터 프리미엄이라는 실증 근거가 있어 동일 비중(40%)을 둔다.
+# 뉴스 감정 결합은 실증 근거가 약해(조사 리포트) 보조 신호로 20%만 반영한다.
+WEIGHTS = {"financial": 0.4, "chart": 0.4, "news": 0.2}
 
 BUY_THRESHOLD = 0.65
 SELL_THRESHOLD = 0.35
@@ -47,14 +49,23 @@ class RecommendationEngine:
 
     @staticmethod
     def normalize_financial(result: dict) -> float:
-        # 재무 판정: 저평가일수록 높은 점수
-        verdict = (result or {}).get("verdict")
+        # 재무 점수: 업종 내 순위비율 종합 점수(0~100)를 0~1로.
+        # 순위비율이 없는 구(舊)캐시 데이터는 verdict 기반으로 폴백한다.
+        result = result or {}
+        val = (result.get("valuation") or {}).get("score")
+        if val is not None:
+            return round(val / 100, 2)
+        verdict = result.get("verdict")
         return {"저평가": 0.8, "고평가": 0.2}.get(verdict, 0.5)
 
     @staticmethod
     def normalize_chart(result: dict) -> float:
-        # 차트 신호 + 신뢰도: buy는 0.5~1.0, sell은 0.0~0.5, hold는 0.5
+        # 6개 지표 투표 점수(0~100)를 0~1로 사용한다. 이 연속값이 대부분 hold(0.5)로
+        # 눌리는 signal 방식보다 정보량이 많다. score가 없는 응답은 signal/confidence로 폴백.
         result = result or {}
+        score = result.get("score")
+        if score is not None:
+            return round(score / 100, 2)
         signal = result.get("signal", "hold")
         confidence = result.get("confidence", 0.5)
         if signal == "buy":
@@ -62,23 +73,6 @@ class RecommendationEngine:
         if signal == "sell":
             return round(0.5 - 0.5 * confidence, 2)
         return 0.5
-
-    @staticmethod
-    def technical_rating(score) -> dict:
-        # 차트 지표 투표 점수(0~100)를 TradingView식 5단계 기술적 평가로 매핑.
-        # (score-50)/50 = 지표 순매수 비율(-1~1). ±0.1/±0.5 임계값은 TradingView 방식과 동일.
-        if score is None:
-            return {"grade": "none", "label": "분석 불가"}
-        v = (score - 50) / 50.0
-        if v >= 0.5:
-            return {"grade": "strong_buy", "label": "적극 매수"}
-        if v >= 0.1:
-            return {"grade": "buy", "label": "매수"}
-        if v > -0.1:
-            return {"grade": "neutral", "label": "중립"}
-        if v > -0.5:
-            return {"grade": "sell", "label": "매도"}
-        return {"grade": "strong_sell", "label": "적극 매도"}
 
     @staticmethod
     def normalize_news(result: dict) -> float:
@@ -107,8 +101,10 @@ class RecommendationEngine:
             health = round((health + max(0, min(100, roe * 5))) / 2)  # ROE 20%면 100
         health = max(0, min(100, round(health)))
 
-        # 밸류에이션: verdict 기반
-        valuation = {"저평가": 80, "고평가": 20}.get(financial.get("verdict"), 50)
+        # 밸류에이션: 순위비율 점수 우선, 없으면 verdict 기반 폴백
+        valuation = (financial.get("valuation") or {}).get("score")
+        if valuation is None:
+            valuation = {"저평가": 80, "고평가": 20}.get(financial.get("verdict"), 50)
 
         # 기술적: chart score(0~100) 우선, 없으면 정규화 점수
         technical = chart.get("score")

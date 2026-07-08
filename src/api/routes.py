@@ -61,13 +61,12 @@ def indices():
 
 
 _top_volume_cache = {}  # (market, limit) -> {"ts", "data"}
-_TOP_VOLUME_TTL = 300    # 5분 캐시(차트 분석이 무거워 재조회 방지)
+_TOP_VOLUME_TTL = 300    # 5분 캐시(네이버 스크래핑 재호출 방지)
 
 
 @api_bp.route("/api/top-volume")
 def top_volume():
-    # 거래량 상위 종목 + 기술적 평가(5단계). 홈 사이드바 '거래량 상위' 화면용.
-    # 추천 등급은 chart_analyzer 지표 투표 점수를 TradingView식 5단계로 매핑한다.
+    # 거래량 상위 종목(현재가·등락률·거래량). 홈 사이드바 '거래량 상위' 화면용.
     market = request.args.get("market", "KOSPI").upper()
     try:
         limit = min(int(request.args.get("limit", 100)), 100)
@@ -84,25 +83,7 @@ def top_volume():
         if not ranking:
             return jsonify({"error": "거래량 상위 종목을 가져오지 못했습니다."}), 502
 
-        def analyze_one(item):
-            chart = _safe(lambda: chart_analyzer.analyze(item["code"]))
-            score = (chart or {}).get("score")
-            rating = recommendation_engine.technical_rating(score)
-            return {
-                **item,
-                "score": score,
-                "signal": (chart or {}).get("signal"),
-                "rating": rating["grade"],
-                "rating_label": rating["label"],
-            }
-
-        # 종목별 차트 분석은 독립적이라 병렬 실행(순서는 거래량 순위 유지)
-        with ThreadPoolExecutor(max_workers=12) as ex:
-            stocks = list(ex.map(analyze_one, ranking))
-
-        for i, s in enumerate(stocks, start=1):
-            s["rank"] = i
-
+        stocks = [{**item, "rank": i} for i, item in enumerate(ranking, start=1)]
         result = {"market": market, "count": len(stocks), "stocks": stocks}
         _top_volume_cache[key] = {"ts": time.time(), "data": result}
         return jsonify(result)
@@ -359,10 +340,13 @@ def analyze_recommendation(code):
             df = krx.get_ohlcv(code)
             if df is not None and not df.empty:
                 current_price = int(df["close"].iloc[-1])
-                pt = price_target_calculator.suggest(current_price)
+                consensus = _safe(lambda: krx.get_consensus_target(code))
+                pt = price_target_calculator.suggest(
+                    current_price, target_price=(consensus or {}).get("target_price"))
                 result["current_price"] = current_price
                 result["target_price"] = pt.get("target_price")
                 result["stop_loss"] = pt.get("stop_loss")
+                result["target_source"] = pt.get("source")
         except Exception:
             pass
         return jsonify(result)
@@ -383,9 +367,14 @@ def analyze_price_target(code):
             return jsonify({"error": "No data found for code: " + code}), 404
 
         current_price = int(df["close"].iloc[-1])
-        result = price_target_calculator.suggest(current_price, expected_return, max_loss)
+        # 목표가는 증권사 컨센서스 평균 우선, 없으면 기대수익률 기반 추정으로 폴백.
+        consensus = _safe(lambda: krx.get_consensus_target(code))
+        result = price_target_calculator.suggest(
+            current_price, expected_return, max_loss,
+            target_price=(consensus or {}).get("target_price"))
         result["code"] = code
         result["as_of"] = str(df["date"].iloc[-1])[:10]
+        result["consensus"] = consensus
 
         # 확장(하위호환): upside·피벗 지지/저항·시나리오. 실패해도 기존 응답 유지.
         try:
@@ -450,8 +439,11 @@ def analyze_all(code):
         ns = recommendation_engine.normalize_news(news) if news else 0.5
         recommendation = recommendation_engine.generate(fs, cs, ns)
 
-        # 4) 목표가·손절 (현재가 기반)
-        price_target = price_target_calculator.suggest(current_price)
+        # 4) 목표가·손절 (증권사 컨센서스 평균 우선, 없으면 추정)
+        consensus = _safe(lambda: krx.get_consensus_target(code))
+        price_target = price_target_calculator.suggest(
+            current_price, target_price=(consensus or {}).get("target_price"))
+        price_target["consensus"] = consensus
 
         return jsonify({
             "stock_code": code,

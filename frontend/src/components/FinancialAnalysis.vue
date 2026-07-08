@@ -33,6 +33,9 @@ const pbrStatus = computed(() =>
   hasIndustry.value ? (data.value.pbr < data.value.industry_avg.pbr ? '✓ 저평가' : '✗ 고평가') : ''
 )
 
+// 순위비율(percentile) 판단 근거 — KRX 밸류업 방식(업종 내 상대평가)
+const valuation = computed(() => data.value?.valuation || null)
+
 const verdictBasis = computed(() => {
   const d = data.value
   if (!d) return ''
@@ -46,6 +49,22 @@ const verdictBasis = computed(() => {
     ' → ' + (pbrLow ? '낮음(저평가 신호)' : '높음(고평가 신호)')
   )
 })
+
+// 지표별 순위비율 점수(0~100, 높을수록 우수). 없는 지표는 제외.
+const rankRows = computed(() => {
+  const c = valuation.value?.components
+  if (!c) return []
+  const meta = [
+    { key: 'per', label: 'PER', note: '낮을수록↑' },
+    { key: 'pbr', label: 'PBR', note: '낮을수록↑' },
+    { key: 'roe', label: 'ROE', note: '높을수록↑' },
+    { key: 'dividend_yield', label: '배당수익률', note: '높을수록↑' },
+  ]
+  return meta
+    .filter((m) => c[m.key] != null)
+    .map((m) => ({ ...m, score: c[m.key] }))
+})
+const scoreColor = (s) => (s >= 60 ? 'var(--buy)' : s <= 40 ? 'var(--sell)' : 'var(--text-muted)')
 </script>
 
 <template>
@@ -62,6 +81,26 @@ const verdictBasis = computed(() => {
         <span class="sig-chip" :class="verdictChip">{{ data.verdict }}</span>
       </div>
       <div class="overview-summary">{{ verdictBasis }}</div>
+
+      <!-- 판단 근거: 업종 내 순위비율(KRX 밸류업 방식) -->
+      <div v-if="rankRows.length" class="rank-basis">
+        <div class="rank-basis-head">
+          <span>업종 내 순위비율 판단 근거</span>
+          <span v-if="valuation?.score != null" class="rank-total">
+            종합 {{ valuation.score }}점
+            <span class="tx-mut">/ 100 · {{ valuation.peer_count }}개사 비교</span>
+          </span>
+        </div>
+        <div v-for="r in rankRows" :key="r.key" class="rank-row">
+          <span class="rank-label">{{ r.label }} <span class="tx-mut">{{ r.note }}</span></span>
+          <span class="rank-bar-track">
+            <span class="rank-bar-fill" :style="{ width: r.score + '%', background: scoreColor(r.score) }"></span>
+          </span>
+          <span class="rank-score" :style="{ color: scoreColor(r.score) }">{{ r.score }}점</span>
+        </div>
+        <div class="tx-mut rank-hint">50점 = 업종 중위, 60점↑ 저평가·40점↓ 고평가 (PER·PBR 기준)</div>
+      </div>
+
       <div class="tx-mut" style="font-size: 12px; margin-top: 8px;">기준일: {{ data.as_of }}</div>
     </div>
 
@@ -153,3 +192,73 @@ const verdictBasis = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.rank-basis {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+.rank-basis-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.rank-total {
+  font-family: var(--mono);
+  font-size: 14px;
+}
+.rank-total .tx-mut {
+  font-weight: 400;
+  font-size: 11px;
+}
+.rank-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.rank-label {
+  flex: 0 0 auto;
+  width: 92px;
+  font-size: 12px;
+}
+.rank-label .tx-mut {
+  font-size: 10px;
+}
+.rank-bar-track {
+  flex: 1 1 auto;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2, #f1f5f9);
+  overflow: hidden;
+}
+.rank-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.rank-score {
+  flex: 0 0 auto;
+  width: 44px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+.rank-hint {
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+/* 태블릿·데스크탑: 라벨 여유 폭 */
+@media (min-width: 768px) {
+  .rank-label { width: 108px; font-size: 13px; }
+}
+</style>

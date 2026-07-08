@@ -5,9 +5,19 @@ DEFAULT_MAX_LOSS = 0.10
 class PriceTargetCalculator:
     def suggest(self, current_price: float,
                 expected_return: float = DEFAULT_EXPECTED_RETURN,
-                max_loss: float = DEFAULT_MAX_LOSS) -> dict:
-        """현재가 기반 목표가·손절가와 리스크/리워드 비율을 계산한다."""
-        target_price = round(current_price * (1 + expected_return))
+                max_loss: float = DEFAULT_MAX_LOSS,
+                target_price: float = None) -> dict:
+        """목표가·손절가와 리스크/리워드 비율을 계산한다.
+        target_price(증권사 컨센서스 평균)가 주어지면 그 값을 목표가로 쓰고
+        기대수익률은 현재가 대비로 역산한다. 없으면 현재가×(1+기대수익률) 추정.
+        손절가는 애널리스트가 제시하지 않으므로 현재가×(1−최대손실률) 가드레일로 둔다."""
+        if target_price and target_price > 0:
+            target_price = round(target_price)
+            expected_return = round((target_price - current_price) / current_price, 4) if current_price else expected_return
+            source = "consensus"
+        else:
+            target_price = round(current_price * (1 + expected_return))
+            source = "estimate"
         stop_loss = round(current_price * (1 - max_loss))
 
         upside = target_price - current_price
@@ -21,6 +31,7 @@ class PriceTargetCalculator:
             "target_price": target_price,
             "stop_loss": stop_loss,
             "risk_reward_ratio": risk_reward_ratio,
+            "source": source,
         }
 
     def extend(self, result: dict, high: float = None, low: float = None,
@@ -48,8 +59,11 @@ class PriceTargetCalculator:
         result["pivot"] = pivot
         result["support"] = support
         result["resistance"] = resistance
+        opt_desc = ("증권사 컨센서스 목표가 도달 시나리오"
+                    if result.get("source") == "consensus"
+                    else "목표가 도달 시나리오 (기대수익 반영)")
         result["scenarios"] = {
-            "optimistic": {"price": target, "desc": "목표가 도달 시나리오 (기대수익 반영)"},
+            "optimistic": {"price": target, "desc": opt_desc},
             "neutral": {"price": cur, "desc": "현재가 유지 (횡보) 시나리오"},
             "pessimistic": {"price": stop, "desc": "손절가 도달 시나리오 (최대손실 반영)"},
         }

@@ -33,12 +33,29 @@ watch(currentCode, () => { active.value = 'overview' })
 
 // 홈 영역에서 보여줄 화면: 'home'(시장개요) | 'ranking'(거래량 상위)
 const homeSection = ref('home')
+// 거래량 상위 시장: 'KOSPI' | 'KOSDAQ'
+const rankingMarket = ref('KOSPI')
 
 // 모바일 사이드바(드로어) 열림 상태
 const sidebarOpen = ref(false)
 function selectTab(key) { active.value = key; sidebarOpen.value = false }
 function navHome() { goHome(); homeSection.value = 'home'; sidebarOpen.value = false }
-function navRanking() { goHome(); homeSection.value = 'ranking'; sidebarOpen.value = false }
+function navRanking(market = 'KOSPI') {
+  goHome(); homeSection.value = 'ranking'; rankingMarket.value = market; sidebarOpen.value = false
+}
+
+// 실시간 데이터 새로고침: content-inner를 리마운트해 현재 화면의 모든 API를 재요청한다.
+// (탭·선택 종목 등 상위 상태는 유지되고, 자식 컴포넌트만 다시 로드)
+const refreshKey = ref(0)
+const refreshing = ref(false)
+let refreshTimer = null
+function refreshData() {
+  refreshKey.value++
+  sidebarOpen.value = false
+  refreshing.value = true
+  clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(() => { refreshing.value = false }, 700)
+}
 
 // 상단바 실시간 시계 (HH:MM)
 const clock = ref('')
@@ -48,7 +65,7 @@ function tick() {
 }
 tick()
 const timer = setInterval(tick, 15000)
-onBeforeUnmount(() => clearInterval(timer))
+onBeforeUnmount(() => { clearInterval(timer); clearTimeout(refreshTimer) })
 </script>
 
 <template>
@@ -68,13 +85,24 @@ onBeforeUnmount(() => clearInterval(timer))
         <div class="logo-text">Stockscope</div>
       </div>
 
+      <div class="sidebar-refresh">
+        <button class="refresh-btn" :class="{ spinning: refreshing }" :disabled="refreshing"
+                @click="refreshData" title="실시간 주가 데이터 새로고침">
+          <span class="refresh-icon">⟳</span>
+          <span>{{ refreshing ? '갱신 중…' : '새로고침' }}</span>
+        </button>
+      </div>
+
       <nav class="sidebar-nav">
         <div class="nav-label">MENU</div>
         <button class="nav-btn" :class="{ active: !currentCode && homeSection === 'home' }" @click="navHome">
           <span>🏠 홈</span>
         </button>
-        <button class="nav-btn" :class="{ active: !currentCode && homeSection === 'ranking' }" @click="navRanking">
-          <span>🔥 거래량 상위</span>
+        <button class="nav-btn" :class="{ active: !currentCode && homeSection === 'ranking' && rankingMarket === 'KOSPI' }" @click="navRanking('KOSPI')">
+          <span>🔥 거래량 상위 (KOSPI)</span>
+        </button>
+        <button class="nav-btn" :class="{ active: !currentCode && homeSection === 'ranking' && rankingMarket === 'KOSDAQ' }" @click="navRanking('KOSDAQ')">
+          <span>🔥 거래량 상위 (KOSDAQ)</span>
         </button>
 
         <template v-if="currentCode">
@@ -111,10 +139,10 @@ onBeforeUnmount(() => clearInterval(timer))
       </header>
 
       <div class="content-scroll">
-        <div class="content-inner">
+        <div class="content-inner" :key="refreshKey">
           <template v-if="!currentCode">
             <HomeView v-if="homeSection === 'home'" />
-            <VolumeRanking v-else />
+            <VolumeRanking v-else :market="rankingMarket" />
           </template>
 
           <template v-else>
