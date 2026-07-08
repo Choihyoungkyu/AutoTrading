@@ -3,7 +3,7 @@
 수집→피처(T03)→라벨/실현손익(T02)→walk-forward 분할(T04)→LightGBM 학습(T05)
 →상위 신호 백테스트+성공 판정(T06). 소규모 유니버스로 빠르게 1회 실행한다.
 
-주의: 원본가(수정주가 미처리)·소규모 유니버스·생존 편향 → 성능 낙관. 데모용.
+주의: point-in-time 분할조정(D1)·소규모 유니버스·생존 편향 잔존 → 성능 낙관. 데모용.
 """
 import sys
 from dotenv import load_dotenv
@@ -13,13 +13,13 @@ import numpy as np
 import pandas as pd
 from pykrx import stock
 
-from src.collectors.krx_collector import KRXCollector
 from src.ml.universe import UniverseSelector
 from src.ml.features import CausalFeatureBuilder
 from src.ml.labels import make_labels, make_returns
 from src.ml.splits import make_folds
 from src.ml.model import SignalModel
 from src.ml.backtest import backtest_fold, evaluate
+from src.ml.prices import adjust_ohlcv, derive_splits
 
 UNIVERSE_ASOF = "20230630"
 TOP_N = 12
@@ -40,12 +40,39 @@ def log(msg):
     print(msg, flush=True)
 
 
+_PYKRX_COLMAP = {"시가": "open", "고가": "high", "저가": "low",
+                 "종가": "close", "거래량": "volume", "등락률": "change"}
+
+
+def _fmt_pykrx(df):
+    """pykrx OHLCV(한글 컬럼)를 파이프라인 표준 컬럼으로 정규화한다(거래대금 등은 버림)."""
+    df = df.rename(columns=_PYKRX_COLMAP)[list(_PYKRX_COLMAP.values())].copy()
+    df.index.name = "date"
+    df = df.reset_index()
+    df["date"] = df["date"].astype(str)
+    return df
+
+
+def fetch_pit_ohlcv(code):
+    """원본가·back-adjusted를 비교해 분할을 복원하고 point-in-time 포워드 조정한 OHLCV(D1).
+
+    pykrx 기본 수정주가는 '오늘' 기준 소급 조정이라 미래참조 누수. 원본가에서
+    분할 이벤트만 추출해 포워드 적용하면 과거 봉 불변·점프 제거를 동시에 만족한다.
+    """
+    raw = stock.get_market_ohlcv(START, END, code, adjusted=False)
+    adj = stock.get_market_ohlcv(START, END, code, adjusted=True)
+    if raw is None or raw.empty:
+        return pd.DataFrame()
+    raw, adj = _fmt_pykrx(raw), _fmt_pykrx(adj)
+    return adjust_ohlcv(raw, derive_splits(raw, adj))
+
+
 def build_panel(codes):
     """유니버스 각 종목의 (date, 피처16, label, gross_ret) 행을 모아 하나의 패널로."""
     builder = CausalFeatureBuilder()
     rows = []
     for code in codes:
-        ohlcv = KRX.get_ohlcv(code, start=START, end=END)
+        ohlcv = fetch_pit_ohlcv(code)
         if ohlcv is None or ohlcv.empty or len(ohlcv) < 80:
             log(f"  - {code}: 데이터 부족, 건너뜀")
             continue
@@ -71,9 +98,6 @@ def index_forward_return(start, end):
         return float(np.mean(fwd)) if fwd else None
     except Exception:
         return None
-
-
-KRX = KRXCollector()
 
 
 def main():
