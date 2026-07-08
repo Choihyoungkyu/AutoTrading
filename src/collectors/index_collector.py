@@ -4,6 +4,7 @@ import requests
 # 이 환경에서 PYKRX 지수 API와 yfinance는 차단/오류이므로,
 # 프로젝트가 이미 재무·뉴스에 쓰는 네이버 금융 API를 사용한다.
 #   국내: polling.finance.naver.com (KOSPI/KOSDAQ)
+#   환율: m.stock.naver.com/front-api/marketIndex/prices (FX_USDKRW)
 #   해외: api.stock.naver.com/index/<symbol>/basic (.IXIC/.INX/.DJI)
 
 
@@ -12,18 +13,38 @@ class IndexCollector:
 
     # (표시명, 시장구분, 네이버 심볼)
     DOMESTIC = [("코스피", "KOSPI"), ("코스닥", "KOSDAQ")]
+    EXCHANGE = [("원/달러", "FX_USDKRW")]
     WORLD = [("나스닥", ".IXIC"), ("S&P500", ".INX"), ("다우", ".DJI")]
 
     def get_indices(self) -> list:
-        return [self._domestic(name, sym) for name, sym in self.DOMESTIC] + [
-            self._world(name, sym) for name, sym in self.WORLD
-        ]
+        return (
+            [self._domestic(name, sym) for name, sym in self.DOMESTIC]
+            + [self._exchange(name, sym) for name, sym in self.EXCHANGE]
+            + [self._world(name, sym) for name, sym in self.WORLD]
+        )
 
     def _domestic(self, name: str, symbol: str) -> dict:
         try:
             url = f"https://polling.finance.naver.com/api/realtime/domestic/index/{symbol}"
             d = requests.get(url, headers=self.HEADERS, timeout=8).json()["datas"][0]
             return self._pack(name, d)
+        except Exception as e:
+            return {"name": name, "error": str(e)}
+
+    def _exchange(self, name: str, symbol: str) -> dict:
+        try:
+            url = (
+                "https://m.stock.naver.com/front-api/marketIndex/prices"
+                f"?category=exchange&reutersCode={symbol}&page=1&pageSize=10"
+            )
+            d = requests.get(url, headers=self.HEADERS, timeout=8).json()["result"][0]
+            # 환율은 closePrice/fluctuations/fluctuationsRatio가 이미 부호 포함
+            return {
+                "name": name,
+                "price": self._num(d.get("closePrice")),
+                "change": round(self._num(d.get("fluctuations")), 2),
+                "changeRate": round(self._num(d.get("fluctuationsRatio")), 2),
+            }
         except Exception as e:
             return {"name": name, "error": str(e)}
 
