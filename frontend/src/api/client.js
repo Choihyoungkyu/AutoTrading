@@ -20,6 +20,7 @@ export const api = {
   overview: (code = STOCK_CODE) => getJson(`/analyze/${code}/overview`),
   financial: (code = STOCK_CODE) => getJson(`/analyze/${code}/financial`),
   chart: (code = STOCK_CODE) => getJson(`/analyze/${code}/chart`),
+  explain: (code = STOCK_CODE) => getJson(`/analyze/${code}/explain`),
   news: (code = STOCK_CODE) => getJson(`/analyze/${code}/news`),
   recommendation: (code = STOCK_CODE) => getJson(`/analyze/${code}/recommendation`),
   priceTarget: (expectedReturn, maxLoss, code = STOCK_CODE) =>
