@@ -46,10 +46,11 @@ def test_boundary_just_below_035_is_sell(engine):
 
 
 def test_weights_applied(engine):
-    # 차트(40%)만 높을 때 가중 반영: 0*0.3 + 1*0.4 + 0*0.3 = 0.4
-    result = engine.generate(0.0, 1.0, 0.0)
-    assert result["score"] == 0.4
-    assert result["grade"] == "hold"
+    # 가중치 재무 40% · 차트 40% · 뉴스 20%
+    assert engine.generate(1.0, 0.0, 0.0)["score"] == 0.4  # 재무만
+    assert engine.generate(0.0, 1.0, 0.0)["score"] == 0.4  # 차트만
+    assert engine.generate(0.0, 0.0, 1.0)["score"] == 0.2  # 뉴스만
+    assert engine.generate(0.0, 1.0, 0.0)["grade"] == "hold"
 
 
 def test_reasoning_present(engine):
@@ -67,7 +68,15 @@ def test_normalize_financial():
     assert RecommendationEngine.normalize_financial(None) == 0.5
 
 
-def test_normalize_chart():
+def test_normalize_chart_score():
+    # score(0~100)가 있으면 우선 사용
+    assert RecommendationEngine.normalize_chart({"score": 83}) == 0.83
+    assert RecommendationEngine.normalize_chart({"score": 0}) == 0.0
+    assert RecommendationEngine.normalize_chart({"score": 100}) == 1.0
+
+
+def test_normalize_chart_fallback():
+    # score가 없으면 signal/confidence로 폴백
     assert RecommendationEngine.normalize_chart({"signal": "buy", "confidence": 1.0}) == 1.0
     assert RecommendationEngine.normalize_chart({"signal": "sell", "confidence": 1.0}) == 0.0
     assert RecommendationEngine.normalize_chart({"signal": "hold", "confidence": 0.5}) == 0.5

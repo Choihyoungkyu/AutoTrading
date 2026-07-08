@@ -22,6 +22,7 @@ def _patches(**overrides):
         "src.api.routes.store.load_financial": {"verdict": "저평가", "as_of": "2026-07-03"},
         "src.api.routes.store.load_news": {"score": 0.6, "sentiment": "positive"},
         "src.api.routes.chart_analyzer.analyze": {"signal": "buy", "confidence": 0.8},
+        "src.api.routes.krx.get_consensus_target": None,
         "src.api.routes.store.save_financial": None,
         "src.api.routes.store.save_news": None,
     }

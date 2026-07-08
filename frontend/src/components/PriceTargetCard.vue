@@ -1,14 +1,11 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useAsyncData } from '../composables/useAsyncData.js'
 import { api } from '../api/client.js'
 import { currentCode } from '../composables/useCurrentStock.js'
 
-const expectedReturn = ref(0.15)
-const maxLoss = ref(0.10)
-
 const { data, error, loading, load } = useAsyncData(
-  () => api.priceTarget(expectedReturn.value, maxLoss.value, currentCode.value)
+  () => api.priceTarget(currentCode.value)
 )
 onMounted(load)
 watch(currentCode, load)
@@ -16,6 +13,21 @@ watch(currentCode, load)
 const pct = (v) => (v == null || isNaN(v)) ? '-' : Math.round(v * 100)
 const won = (v) => (v == null || isNaN(v)) ? '-' : Number(v).toLocaleString() + '원'
 const num = (v) => (v == null || isNaN(v)) ? '-' : Number(v).toLocaleString()
+
+// 목표가 출처: 증권사 컨센서스 평균 vs 커버리지 없어 기본 추정
+const consensus = computed(() => data.value?.consensus || null)
+const isConsensus = computed(() => data.value?.source === 'consensus' && !!consensus.value)
+
+// 평균 투자의견(1~5, 높을수록 매수) → 라벨
+const opinionLabel = computed(() => {
+  const m = consensus.value?.recomm_mean
+  if (m == null) return null
+  if (m >= 4.5) return '적극 매수'
+  if (m >= 3.5) return '매수'
+  if (m >= 2.5) return '중립'
+  if (m >= 1.5) return '매도'
+  return '적극 매도'
+})
 
 // 지지·저항 사다리 좌표
 const ladder = computed(() => {
@@ -59,6 +71,18 @@ const scen = computed(() => data.value?.scenarios || null)
   <div v-if="error" class="card"><div class="error">목표가 로드 실패: {{ error }}</div></div>
   <div v-else-if="loading || !data" class="card"><div class="loading">계산 중...</div></div>
   <div v-else>
+    <!-- 목표가 출처 배너 -->
+    <div class="pt-source" :class="isConsensus ? 'is-consensus' : 'is-estimate'">
+      <template v-if="isConsensus">
+        📊 <b>증권사 컨센서스 평균 목표가</b>
+        <span v-if="opinionLabel"> · 평균 투자의견 <b>{{ opinionLabel }}</b> ({{ consensus.recomm_mean }})</span>
+        <span v-if="consensus.as_of" class="tx-mut"> · 기준 {{ consensus.as_of }}</span>
+      </template>
+      <template v-else>
+        ⚠️ 이 종목은 증권사 목표가 컨센서스가 없어 <b>기본 추정치</b>(현재가 +{{ pct(data.expected_return) }}%)로 표시합니다.
+      </template>
+    </div>
+
     <!-- KPI 4카드 -->
     <div class="kpi-grid">
       <div class="kpi-card">
@@ -124,21 +148,36 @@ const scen = computed(() => data.value?.scenarios || null)
       </div>
     </div>
 
-    <!-- 슬라이더 -->
+    <!-- 산출 기준 -->
     <div class="card" style="margin-top: 16px;">
-      <div class="pt-controls">
-        <label>
-          기대수익률: <strong class="tx-buy">{{ pct(expectedReturn) }}%</strong>
-          <input type="range" min="0.05" max="0.5" step="0.05" v-model.number="expectedReturn" @change="load" />
-        </label>
-        <label>
-          최대손실률: <strong class="tx-sell">{{ pct(maxLoss) }}%</strong>
-          <input type="range" min="0.05" max="0.3" step="0.05" v-model.number="maxLoss" @change="load" />
-        </label>
-      </div>
-      <div class="tx-mut" style="font-size: 11px; margin-top: 12px;">
-        목표가 = 현재가 ×(1+기대수익률) · 손절가 = 현재가 ×(1−최대손실률) · 지지/저항 = 피벗 포인트 계산
+      <div class="tx-mut" style="font-size: 11px; line-height: 1.7;">
+        <template v-if="isConsensus">
+          목표가 = 증권사 컨센서스 평균 목표주가 · 손절가 = 현재가 ×(1−{{ pct(data.max_loss) }}%) 리스크 가드레일 · 지지/저항 = 피벗 포인트 계산
+        </template>
+        <template v-else>
+          목표가 = 현재가 ×(1+{{ pct(data.expected_return) }}%) 추정 · 손절가 = 현재가 ×(1−{{ pct(data.max_loss) }}%) · 지지/저항 = 피벗 포인트 계산
+        </template>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.pt-source {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.pt-source.is-consensus {
+  background: var(--buy-bg, rgba(34, 197, 94, 0.1));
+  color: var(--tx);
+  border: 1px solid var(--buy);
+}
+.pt-source.is-estimate {
+  background: var(--hold-bg, rgba(234, 179, 8, 0.1));
+  color: var(--tx);
+  border: 1px solid var(--hold);
+}
+</style>

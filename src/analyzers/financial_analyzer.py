@@ -45,17 +45,23 @@ class FinancialAnalyzer:
             "dividend_yield": m.get("dividend_yield", 0),
         }
 
+    def _collect_peer_metrics(self, peer_codes: list) -> list:
+        # peer별 조회를 병렬화(순차 시 종목 수만큼 느려짐). 빈 결과는 제거.
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            all_metrics = list(ex.map(self._peer_metrics, peer_codes)) if peer_codes else []
+        return [m for m in all_metrics if m]
+
     def get_industry_average(self, peer_codes: list) -> dict:
+        # 하위호환 편의 메서드: peer 코드로 중앙값 요약을 바로 계산.
+        return self._industry_average(self._collect_peer_metrics(peer_codes))
+
+    def _industry_average(self, peer_metrics: list) -> dict:
         per_values = []
         pbr_values = []
         roe_values = []
         dividend_values = []
 
-        # peer별 네이버 조회를 병렬화(순차 시 종목 수만큼 느려짐)
-        with ThreadPoolExecutor(max_workers=8) as ex:
-            all_metrics = list(ex.map(self._peer_metrics, peer_codes)) if peer_codes else []
-
-        for metrics in all_metrics:
+        for metrics in peer_metrics:
             if not metrics:
                 continue
             if metrics.get("per", 0) > 0:
@@ -86,31 +92,69 @@ class FinancialAnalyzer:
         mid = n // 2
         return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
 
-    def determine_verdict(self, metrics: dict, industry_avg: dict) -> str:
-        per_lower = metrics.get("per", 0) < industry_avg.get("per", float("inf"))
-        pbr_lower = metrics.get("pbr", 0) < industry_avg.get("pbr", float("inf"))
-        per_higher = metrics.get("per", 0) > industry_avg.get("per", 0)
-        pbr_higher = metrics.get("pbr", 0) > industry_avg.get("pbr", 0)
-
-        if per_lower and pbr_lower:
-            return "저평가"
-        elif per_higher and pbr_higher:
-            return "고평가"
+    @staticmethod
+    def _percentile(value, peer_values: list, higher_is_better: bool):
+        # value가 업종 peer 대비 상위 몇 %인지 0~100(높을수록 우수).
+        # KRX 밸류업 지수의 '산업군 내 순위비율' 방식. 이상치는 순위에만 영향(강건).
+        vals = [v for v in peer_values if v is not None and v > 0]
+        if value is None or value <= 0 or not vals:
+            return None
+        if higher_is_better:
+            wins = sum(1 for v in vals if value > v)
         else:
+            wins = sum(1 for v in vals if value < v)
+        ties = sum(1 for v in vals if value == v)
+        return round((wins + 0.5 * ties) / len(vals) * 100)
+
+    def score_valuation(self, metrics: dict, peer_metrics: list) -> dict:
+        """업종 peer 대비 순위비율(0~100)로 재무 점수 산출. KRX 밸류업 방식.
+        PER·PBR은 낮을수록, ROE·배당은 높을수록 높은 점수.
+        - valuation_score: PER+PBR 평균 → 저평가/고평가 판정
+        - score: 4개 지표 평균 → 추천 엔진 반영(종합 매력도)"""
+        peers = [m for m in peer_metrics if m]
+        per = self._percentile(metrics.get("per"), [m.get("per") for m in peers], higher_is_better=False)
+        pbr = self._percentile(metrics.get("pbr"), [m.get("pbr") for m in peers], higher_is_better=False)
+        roe = self._percentile(metrics.get("roe"), [m.get("roe") for m in peers], higher_is_better=True)
+        div = self._percentile(metrics.get("dividend_yield"),
+                               [m.get("dividend_yield") for m in peers], higher_is_better=True)
+        components = {"per": per, "pbr": pbr, "roe": roe, "dividend_yield": div}
+
+        def _mean(items):
+            vals = [x for x in items if x is not None]
+            return round(sum(vals) / len(vals)) if vals else None
+
+        return {
+            "score": _mean([per, pbr, roe, div]),
+            "valuation_score": _mean([per, pbr]),
+            "components": components,
+            "peer_count": len(peers),
+        }
+
+    @staticmethod
+    def _verdict_from_score(valuation_score) -> str:
+        # 밸류에이션 순위비율(0~100, 50=업종 중위)로 판정.
+        if valuation_score is None:
             return "중립"
+        if valuation_score >= 60:
+            return "저평가"
+        if valuation_score <= 40:
+            return "고평가"
+        return "중립"
 
     def analyze(self, code: str) -> dict:
         metrics = self.get_financial_metrics(code)
         if not metrics:
             return None
 
-        # 조회 종목의 업종을 파악해 동일업종 종목으로 업계 평균을 낸다.
+        # 조회 종목의 업종을 파악해 동일업종 종목으로 업계 평균·순위비율을 낸다.
         # 업종/peer 조회 실패 시 폴백 없이 "조회 실패"로 표시한다.
         industry = self.krx.get_industry(code)
         peers = [c for c in self.krx.get_industry_peers(industry.get("no")) if c != code]
-        industry_avg = self.get_industry_average(peers)
+        peer_metrics = self._collect_peer_metrics(peers)  # 중앙값·순위비율 공용(1회 조회)
+        industry_avg = self._industry_average(peer_metrics)
         industry_ok = bool(industry.get("name")) and industry_avg.get("peer_count", 0) > 0
-        verdict = self.determine_verdict(metrics, industry_avg) if industry_ok else "조회 실패"
+        valuation = self.score_valuation(metrics, peer_metrics) if industry_ok else None
+        verdict = self._verdict_from_score(valuation["valuation_score"]) if valuation else "조회 실패"
 
         return {
             "code": code,
@@ -130,5 +174,6 @@ class FinancialAnalyzer:
                 "dividend_yield": round(industry_avg["dividend_yield"], 2),
                 "peer_count": industry_avg.get("peer_count", 0),
             } if industry_ok else None,
+            "valuation": valuation,
             "verdict": verdict,
         }
