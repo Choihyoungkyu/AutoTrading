@@ -19,7 +19,8 @@ from src.ml.features import CausalFeatureBuilder
 from src.ml.labels import make_labels, make_returns
 from src.ml.splits import make_folds
 from src.ml.model import SignalModel
-from src.ml.backtest import backtest_fold, evaluate
+from src.ml.backtest import backtest_fold
+from src.ml.reliability import reliability_report
 from src.ml.prices import adjust_ohlcv, derive_splits
 from src.ml.universe_schedule import filter_panel_to_universe
 
@@ -196,10 +197,19 @@ def main():
     if not fold_metrics:
         log("유효 폴드 없음."); return
 
-    log("[성공 판정]")
-    res = evaluate(fold_metrics, cost=COST, n_trials=1)
-    log(f"    성공={res['success']}  ({res['n_beat']}/{res['n_folds']} 승리, "
-        f"통과기준 {res['required_to_pass']}, 마진={res['margin']:.4f})")
+    log("[성공 판정 + 신뢰성 리포트 (D3)]")
+    rep = reliability_report(fold_metrics, n_trials=1, cost=COST)
+    ev = rep["eval"]
+    log(f"    성공={ev['success']}  ({ev['n_beat']}/{ev['n_folds']} 승리, "
+        f"통과기준 {ev['required_to_pass']}, 마진={ev['margin']:.4f})")
+    log(f"    전략순수익 평균={rep['strategy_net_mean']:+.4f} 표준편차={rep['strategy_net_std']:.4f} "
+        f"편차범위={rep['strategy_net_spread']:.4f}")
+    log(f"    기준선 초과 폴드={rep['n_positive_excess']}/{rep['n_folds']} "
+        f"(0이면 한 번도 기준선을 못 이김)")
+    sr = rep["sharpe_across_folds"]
+    log(f"    폴드간 Sharpe={sr:+.3f} deflated임계치={rep['deflated_sharpe_threshold']:.3f} "
+        f"통과={rep['passes_deflated_sharpe']}  (폴드 수 적어 추정 약함)")
+    res = rep  # 경고 출력 재사용
 
     if sample_reason:
         code, d, pred = sample_reason

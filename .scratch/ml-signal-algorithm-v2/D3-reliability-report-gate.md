@@ -15,13 +15,21 @@ gate: "D→C"
 
 ## Acceptance criteria
 
-- [ ] 폴드 전반의 성과 **안정성** 리포트(구간별 편차, 승리 폴드 수)
-- [ ] **n_trials 보고 + deflated Sharpe 보정** (튜닝 반복이 성과를 부풀렸는지)
-- [ ] 생존 편향으로 성능이 낙관적임을 리포트에 명시
-- [ ] **GO/STOP 판정 문서화:**
+- [x] 폴드 전반의 성과 **안정성** 리포트(구간별 편차, 승리 폴드 수)
+- [x] **n_trials 보고 + deflated Sharpe 보정** (튜닝 반복이 성과를 부풀렸는지)
+- [x] 생존 편향으로 성능이 낙관적임을 리포트에 명시
+- [x] **GO/STOP 판정 문서화:**
   - 측정이 안정적 + 여전히 엣지 없음 → **GO to C**
   - 확대 표본에서 차트만으로 엣지 발견 → **별도 재평가**(v1 소표본 오판)
   - 측정이 불안정(폴드별 널뛰기) → **STOP**, 하네스 재점검
+
+## 완료 (2026-07-08) — 판정: **GO to C**
+
+- 신규: `src/ml/reliability.py`(`reliability_report`: 폴드 안정성 + deflated Sharpe),
+  `tests/test_ml_reliability.py`(5 테스트). `run_demo.py` 판정 섹션이 리포트를 출력.
+- 판정 문서: `docs/ml-signal-v2-d3-gate.md`
+- 실측: 4폴드 모두 기준선 초과수익 음수(0/4), 평균·Sharpe 음수 → **측정 안정 + 엣지 부재**
+  → 설계 게이트 규칙에 따라 **GO to C**. C1·C2 활성화.
 
 ## Gate
 
