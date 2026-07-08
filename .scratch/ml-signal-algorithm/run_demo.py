@@ -3,7 +3,8 @@
 수집→피처(T03)→라벨/실현손익(T02)→walk-forward 분할(T04)→LightGBM 학습(T05)
 →상위 신호 백테스트+성공 판정(T06). 소규모 유니버스로 빠르게 1회 실행한다.
 
-주의: point-in-time 분할조정(D1)·소규모 유니버스·생존 편향 잔존 → 성능 낙관. 데모용.
+주의: point-in-time 분할조정(D1)·시점별 유니버스 재선정(D2)·데모 서브셋. 상폐 종목
+미포함으로 생존 편향은 잔존(B2에서 완화) → 성능 낙관. 데모용.
 """
 import sys
 from dotenv import load_dotenv
@@ -20,14 +21,19 @@ from src.ml.splits import make_folds
 from src.ml.model import SignalModel
 from src.ml.backtest import backtest_fold, evaluate
 from src.ml.prices import adjust_ohlcv, derive_splits
+from src.ml.universe_schedule import filter_panel_to_universe
 
-UNIVERSE_ASOF = "20230630"
-TOP_N = 12
+# D2: 시점별 유니버스 재선정(연 1회) + 5폴드 walk-forward + 락박스 봉인.
+# TOP_N은 데모 서브셋(런타임 절약). 코드는 100~200을 지원한다(D2 이슈 기준).
+TOP_N = 30
+START, END = "20190101", "20241231"
+FOLDS = [("20200101", "20201231"), ("20210101", "20211231"),
+         ("20220101", "20221231"), ("20230101", "20231231"),
+         ("20240101", "20241231")]
+LOCKBOX = ("20240101", "20241231")  # 최종 봉인 — D2에서는 개봉하지 않음(D3에서 1회)
 # KRX 시장전체 by_ticker 엔드포인트 다운 시 폴백: 코스피 대형주(상폐 리스크 낮음)
 FALLBACK_CODES = ["005930", "000660", "373220", "207940", "005380", "000270",
                   "068270", "005490", "035420", "035720", "105560", "055550"]
-START, END = "20210101", "20241231"
-FOLDS = [("20230101", "20231231"), ("20240101", "20241231")]
 EMBARGO = 5
 HORIZON = 5
 COST = 0.007
@@ -89,6 +95,31 @@ def build_panel(codes):
     return pd.concat(rows, ignore_index=True)
 
 
+def _trading_days(start, end):
+    """코스피 지수 거래일(YYYYMMDD) 리스트 — 유니버스 리밸런스 as_of의 유효 기준."""
+    idx = stock.get_index_ohlcv(start, end, "1001")
+    return [d.strftime("%Y%m%d") for d in idx.index]
+
+
+def build_rebalances():
+    """연 1회(각 해 첫 거래일) point-in-time 유니버스 재선정. {as_of: codes}.
+
+    각 as_of 그 날짜 데이터만으로 거래대금 상위를 뽑으므로 미래참조가 없다.
+    """
+    days = _trading_days(START, END)
+    firsts, seen = [], set()
+    for d in days:
+        if d[:4] not in seen:
+            seen.add(d[:4]); firsts.append(d)
+    selector = UniverseSelector()
+    rebs = {}
+    for as_of in firsts:
+        codes = selector.get_universe(as_of, top_n=TOP_N)
+        if codes:
+            rebs[as_of] = codes
+    return rebs
+
+
 def index_forward_return(start, end):
     """코스피 지수의 HORIZON일 선도수익 평균. 지수 피드 다운 시 None 반환(프록시로 대체)."""
     try:
@@ -101,29 +132,39 @@ def index_forward_return(start, end):
 
 
 def main():
-    log(f"[1] 유니버스: {UNIVERSE_ASOF} 거래대금 상위 {TOP_N}")
-    codes = UniverseSelector().get_universe(UNIVERSE_ASOF, top_n=TOP_N)
-    if not codes:
-        log("    ⚠ KRX by_ticker 다운 → 대형주 고정 목록으로 폴백")
-        codes = FALLBACK_CODES
-    log(f"    → {codes}")
+    log(f"[1] 시점별 유니버스 재선정 (연 1회, 거래대금 상위 {TOP_N})")
+    rebalances = build_rebalances()
+    if not rebalances:
+        log("    ⚠ KRX by_ticker 다운 → 대형주 고정 목록으로 폴백(단일 리밸런스)")
+        rebalances = {START: FALLBACK_CODES}
+    for as_of, codes in rebalances.items():
+        log(f"    {as_of}: {len(codes)}종목")
+    union = sorted({c for codes in rebalances.values() for c in codes})
+    log(f"    유니버스 합집합 {len(union)}종목")
 
-    log(f"[2] 패널 구축: OHLCV {START}~{END}")
-    panel = build_panel(codes)
+    log(f"[2] 패널 구축: OHLCV {START}~{END} (합집합 {len(union)}종목)")
+    panel = build_panel(union)
     if panel.empty:
         log("패널 비어있음. 중단."); return
-    log(f"    총 {len(panel)}행, 라벨 매수비율={panel['label'].mean():.3f}")
+    log(f"    조정 전 {len(panel)}행 → 시점별 유니버스 멤버십 필터 적용")
+    panel = filter_panel_to_universe(panel, rebalances)
+    if panel.empty:
+        log("필터 후 패널 비어있음. 중단."); return
+    log(f"    필터 후 {len(panel)}행, 라벨 매수비율={panel['label'].mean():.3f}")
 
-    log(f"[3] walk-forward 분할 (embargo={EMBARGO})")
+    log(f"[3] walk-forward 분할 (embargo={EMBARGO}, lockbox={LOCKBOX})")
     dates = sorted(panel["date"].unique())
-    folds = make_folds(dates, FOLDS, embargo=EMBARGO)
+    folds = make_folds(dates, FOLDS, embargo=EMBARGO, lockbox=LOCKBOX)
     for f in folds:
-        log(f"    학습 {f['train']} → 검증 {f['val']}")
+        tag = "  [LOCKBOX·봉인]" if f["is_lockbox"] else ""
+        log(f"    학습 {f['train']} → 검증 {f['val']}{tag}")
 
-    log("[4~6] 폴드별 학습→예측→백테스트")
+    log("[4~6] 폴드별 학습→예측→백테스트 (락박스 폴드는 D2에서 개봉 안 함)")
     fold_metrics = []
     sample_reason = None
     for f in folds:
+        if f["is_lockbox"]:
+            log(f"    검증 {f['val']}: 락박스 봉인 — D2 미개봉(D3 최종 1회)"); continue
         (tr_s, tr_e), (va_s, va_e) = f["train"], f["val"]
         tr = panel[(panel["date"] >= tr_s) & (panel["date"] <= tr_e)]
         va = panel[(panel["date"] >= va_s) & (panel["date"] <= va_e)]
