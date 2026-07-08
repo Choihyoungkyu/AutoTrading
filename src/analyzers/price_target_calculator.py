@@ -22,3 +22,35 @@ class PriceTargetCalculator:
             "stop_loss": stop_loss,
             "risk_reward_ratio": risk_reward_ratio,
         }
+
+    def extend(self, result: dict, high: float = None, low: float = None,
+               close: float = None) -> dict:
+        """기존 suggest() 결과에 upside/pivot/support/resistance/scenarios 추가.
+        피벗은 직전 봉의 H/L/C로 계산(값이 없으면 support/resistance는 [])."""
+        cur = result.get("current_price")
+        target = result.get("target_price")
+        stop = result.get("stop_loss")
+
+        upside = round((target - cur) / cur * 100, 2) if cur else None
+
+        pivot = None
+        support, resistance = [], []
+        if high is not None and low is not None and close is not None:
+            pivot = round((high + low + close) / 3)
+            r1 = round(2 * pivot - low)
+            s1 = round(2 * pivot - high)
+            r2 = round(pivot + (high - low))
+            s2 = round(pivot - (high - low))
+            support = [s1, s2]
+            resistance = [r1, r2]
+
+        result["upside"] = upside
+        result["pivot"] = pivot
+        result["support"] = support
+        result["resistance"] = resistance
+        result["scenarios"] = {
+            "optimistic": {"price": target, "desc": "목표가 도달 시나리오 (기대수익 반영)"},
+            "neutral": {"price": cur, "desc": "현재가 유지 (횡보) 시나리오"},
+            "pessimistic": {"price": stop, "desc": "손절가 도달 시나리오 (최대손실 반영)"},
+        }
+        return result

@@ -3,7 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>주식 분석 시스템</title>
+    <title>Stockscope · 주식 분석 시스템</title>
+    <script>
+      // 초기 테마를 마운트 전에 적용해 화면 깜빡임(FOUC) 방지. 기본값 다크.
+      (function () {
+        var t = localStorage.getItem('app-theme') === 'light' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-app-theme', t);
+      })();
+    </script>
+    <style>html, body { background: #0F172A; }</style>
 </head>
 <body>
     <div id="app"></div>

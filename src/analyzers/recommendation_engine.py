@@ -64,7 +64,104 @@ class RecommendationEngine:
         return 0.5
 
     @staticmethod
+    def technical_rating(score) -> dict:
+        # 차트 지표 투표 점수(0~100)를 TradingView식 5단계 기술적 평가로 매핑.
+        # (score-50)/50 = 지표 순매수 비율(-1~1). ±0.1/±0.5 임계값은 TradingView 방식과 동일.
+        if score is None:
+            return {"grade": "none", "label": "분석 불가"}
+        v = (score - 50) / 50.0
+        if v >= 0.5:
+            return {"grade": "strong_buy", "label": "적극 매수"}
+        if v >= 0.1:
+            return {"grade": "buy", "label": "매수"}
+        if v > -0.1:
+            return {"grade": "neutral", "label": "중립"}
+        if v > -0.5:
+            return {"grade": "sell", "label": "매도"}
+        return {"grade": "strong_sell", "label": "적극 매도"}
+
+    @staticmethod
     def normalize_news(result: dict) -> float:
         # 뉴스 감정 점수 [-1, 1] → [0, 1]
         raw = (result or {}).get("score", 0.0)
         return round((raw + 1) / 2, 2)
+
+    # --- 프론트 확장: confidence / factors / dimensions ---
+
+    def extend(self, result: dict, financial: dict, chart: dict, news: dict,
+               fs: float, cs: float, ns: float) -> dict:
+        """기존 recommendation 결과에 confidence·factors·dimensions 추가.
+        원본 분석 dict(financial/chart/news)와 정규화 점수(fs/cs/ns)를 재활용한다."""
+        financial = financial or {}
+        chart = chart or {}
+        news = news or {}
+
+        # factors: 5개 항목 0~100
+        # 재무 건전성: debt_ratio(낮을수록↑) + roe(높을수록↑)
+        debt = financial.get("debt_ratio")
+        roe = financial.get("roe")
+        health = 50
+        if debt is not None:
+            health = max(0, min(100, 100 - debt / 2))  # 부채 200%면 0점
+        if roe is not None:
+            health = round((health + max(0, min(100, roe * 5))) / 2)  # ROE 20%면 100
+        health = max(0, min(100, round(health)))
+
+        # 밸류에이션: verdict 기반
+        valuation = {"저평가": 80, "고평가": 20}.get(financial.get("verdict"), 50)
+
+        # 기술적: chart score(0~100) 우선, 없으면 정규화 점수
+        technical = chart.get("score")
+        if technical is None:
+            technical = round(cs * 100)
+
+        # 모멘텀: RSI + OBV 방향으로 근사 (없으면 기술점수로 폴백)
+        rsi = chart.get("rsi")
+        if rsi is not None:
+            momentum = max(0, min(100, round(rsi)))  # RSI 자체를 모멘텀 강도로
+        else:
+            momentum = round(cs * 100)
+
+        # 뉴스 감성: 정규화 점수(0~1)*100
+        news_score = round(ns * 100)
+
+        factors = [
+            {"name": "재무 건전성", "score": health},
+            {"name": "밸류에이션", "score": valuation},
+            {"name": "기술적 분석", "score": max(0, min(100, round(technical)))},
+            {"name": "모멘텀", "score": momentum},
+            {"name": "뉴스 감성", "score": news_score},
+        ]
+
+        # dimensions: 재무 / 기술적 / 뉴스 감성
+        fin_signal = "buy" if fs >= 0.65 else "sell" if fs < 0.35 else "hold"
+        fin_tag = "우수" if fs >= 0.65 else "주의" if fs < 0.35 else "보통"
+        chart_signal = chart.get("signal", "hold")
+        chart_tag = {"buy": "매수 우위", "sell": "매도 우위"}.get(chart_signal, "중립")
+        news_sentiment = news.get("sentiment", "neutral")
+        news_signal = {"positive": "buy", "negative": "sell"}.get(news_sentiment, "hold")
+        news_tag = {"positive": "긍정", "negative": "부정"}.get(news_sentiment, "중립")
+
+        dimensions = [
+            {"name": "재무", "tag": fin_tag, "signal": fin_signal,
+             "desc": f"{financial.get('verdict', '평가 정보 없음')}"},
+            {"name": "기술적", "tag": chart_tag, "signal": chart_signal,
+             "desc": f"기술 신호 {chart_signal}, 점수 {chart.get('score', '-')}"},
+            {"name": "뉴스 감성", "tag": news_tag, "signal": news_signal,
+             "desc": f"뉴스 심리 {news_tag} ({news.get('article_count', 0)}건)"},
+        ]
+
+        # confidence: 세 컴포넌트의 방향 일치도(모두 같은 방향이면↑) 기반 0~100
+        scores = [fs, cs, ns]
+        # 중립(0.5)에서 얼마나 벗어나 같은 방향인지: 평균 편차 크기
+        avg = sum(scores) / len(scores)
+        spread = sum(abs(s - avg) for s in scores) / len(scores)  # 낮을수록 일치
+        strength = abs(avg - 0.5) * 2  # 방향 강도 0~1
+        agreement = max(0.0, 1 - spread * 2)  # 일치도 0~1
+        confidence = round((strength * 0.5 + agreement * 0.5) * 100)
+        confidence = max(0, min(100, confidence))
+
+        result["confidence"] = confidence
+        result["factors"] = factors
+        result["dimensions"] = dimensions
+        return result

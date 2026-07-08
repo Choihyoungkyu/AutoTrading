@@ -2,9 +2,9 @@ from flask import Blueprint, jsonify, request, send_from_directory
 from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor
 import os
+import time
 import pandas as pd
 from src.collectors.krx_collector import KRXCollector
-from src.collectors.yfinance_collector import YFinanceCollector
 from src.collectors.index_collector import IndexCollector
 from src.storage.data_store import DataStore
 from src.analyzers.financial_analyzer import FinancialAnalyzer
@@ -16,9 +16,8 @@ from src.analyzers.price_target_calculator import PriceTargetCalculator
 
 api_bp = Blueprint("api", __name__)
 krx = KRXCollector()
-yf = YFinanceCollector()
 store = DataStore()
-financial_analyzer = FinancialAnalyzer(krx, yf)
+financial_analyzer = FinancialAnalyzer(krx)
 chart_analyzer = ChartAnalyzer(krx)
 news_collector = NewsCollector(krx)
 news_analyzer = NewsAnalyzer(news_collector)
@@ -59,6 +58,56 @@ def search():
 def indices():
     # 홈 화면용 주요 지수(코스피·코스닥·나스닥·S&P500·다우) 가격·등락률
     return jsonify(index_collector.get_indices())
+
+
+_top_volume_cache = {}  # (market, limit) -> {"ts", "data"}
+_TOP_VOLUME_TTL = 300    # 5분 캐시(차트 분석이 무거워 재조회 방지)
+
+
+@api_bp.route("/api/top-volume")
+def top_volume():
+    # 거래량 상위 종목 + 기술적 평가(5단계). 홈 사이드바 '거래량 상위' 화면용.
+    # 추천 등급은 chart_analyzer 지표 투표 점수를 TradingView식 5단계로 매핑한다.
+    market = request.args.get("market", "KOSPI").upper()
+    try:
+        limit = min(int(request.args.get("limit", 100)), 100)
+    except ValueError:
+        limit = 100
+
+    key = (market, limit)
+    cached = _top_volume_cache.get(key)
+    if cached and time.time() - cached["ts"] < _TOP_VOLUME_TTL:
+        return jsonify(cached["data"])
+
+    try:
+        ranking = krx.get_top_volume(market, limit)
+        if not ranking:
+            return jsonify({"error": "거래량 상위 종목을 가져오지 못했습니다."}), 502
+
+        def analyze_one(item):
+            chart = _safe(lambda: chart_analyzer.analyze(item["code"]))
+            score = (chart or {}).get("score")
+            rating = recommendation_engine.technical_rating(score)
+            return {
+                **item,
+                "score": score,
+                "signal": (chart or {}).get("signal"),
+                "rating": rating["grade"],
+                "rating_label": rating["label"],
+            }
+
+        # 종목별 차트 분석은 독립적이라 병렬 실행(순서는 거래량 순위 유지)
+        with ThreadPoolExecutor(max_workers=12) as ex:
+            stocks = list(ex.map(analyze_one, ranking))
+
+        for i, s in enumerate(stocks, start=1):
+            s["rank"] = i
+
+        result = {"market": market, "count": len(stocks), "stocks": stocks}
+        _top_volume_cache[key] = {"ts": time.time(), "data": result}
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @api_bp.route("/api/quote/<code>")
@@ -139,21 +188,6 @@ def stock_kr_price_history(code):
         return jsonify({"error": str(e)}), 500
 
 
-@api_bp.route("/api/stock/us/<symbol>")
-def stock_us(symbol):
-    period = request.args.get("period", "1mo")
-    try:
-        df = yf.get_ohlcv(symbol, period=period)
-        store.save(df, table=f"us_{symbol.lower()}")
-        return jsonify({
-            "symbol": symbol,
-            "count": len(df),
-            "data": df.tail(5).to_dict(orient="records")
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
 def _ensure_as_of(code, data):
     # 재무 데이터에 기준일이 없으면 최신 거래일(OHLCV)로 채운다.
     # 프론트는 as_of가 없으면 신뢰 불가로 보고 데이터를 숨기므로, 항상 채워준다.
@@ -167,22 +201,97 @@ def _ensure_as_of(code, data):
     return data
 
 
+@api_bp.route("/analyze/<code>/overview")
+def analyze_overview(code):
+    # 개요 탭용. 여러 소스를 묶어 반환. 실패한 필드는 null 폴백.
+    try:
+        df = krx.get_ohlcv(code)
+        if df is None or df.empty:
+            return jsonify({"error": "No data found for code: " + code}), 404
+
+        current_price = int(df["close"].iloc[-1])
+        as_of = str(df["date"].iloc[-1])[:10]
+        volume = int(df["volume"].iloc[-1])
+
+        # 등락: 최근 2봉 종가 차이 (없으면 change 컬럼)
+        change = change_rate = None
+        try:
+            if len(df) >= 2:
+                prev = float(df["close"].iloc[-2])
+                change = round(current_price - prev)
+                change_rate = round((current_price - prev) / prev * 100, 2) if prev else None
+        except Exception:
+            pass
+
+        # 52주 최고/최저: pykrx 1년 OHLCV로 계산. 실패 시 null.
+        week52_high = week52_low = None
+        try:
+            today = datetime.now()
+            start = (today - timedelta(days=365)).strftime("%Y%m%d")
+            end = today.strftime("%Y%m%d")
+            ydf = krx.get_ohlcv(code, start=start, end=end)
+            if ydf is not None and not ydf.empty:
+                week52_high = int(ydf["high"].max())
+                week52_low = int(ydf["low"].min())
+        except Exception:
+            pass
+
+        # sector: 재무 분석의 업종명(industry_name)
+        fin = _safe(lambda: store.load_financial(code) or financial_analyzer.analyze(code))
+        sector = (fin or {}).get("industry_name")
+
+        foreign_ratio = _safe(lambda: krx.get_foreign_ratio(code))
+
+        return jsonify({
+            "code": code,
+            "name": krx.get_name(code),
+            "as_of": as_of,
+            "current_price": current_price,
+            "change": change,
+            "change_rate": change_rate,
+            "market_cap": _safe(lambda: krx.get_market_cap_value(code)),
+            "sector": sector,
+            "summary": _safe(lambda: krx.get_company_summary(code)),
+            "week52_high": week52_high,
+            "week52_low": week52_low,
+            "volume": volume,
+            "foreign_ratio": foreign_ratio,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @api_bp.route("/analyze/<code>/financial")
 def analyze_financial(code):
     try:
         cached = store.load_financial(code)
-        if cached:
-            return jsonify(_ensure_as_of(code, cached))
-
-        result = financial_analyzer.analyze(code)
+        result = cached if cached else financial_analyzer.analyze(code)
         if not result:
             return jsonify({"error": "No data found for code: " + code}), 404
 
         result = _ensure_as_of(code, result)
-        store.save_financial(code, result)
+        if not cached:
+            store.save_financial(code, result)
+
+        # 확장(하위호환): 연간 실적·유보율. 실패해도 기존 응답 유지.
+        result = _extend_financial(code, result)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def _extend_financial(code, result):
+    # 네이버 '기업실적분석'에서 연간 실적·유보율·부채비율을 수집.
+    # 절대 지어내지 않고, 못 구하면 빈 배열/None 유지.
+    nf = _safe(lambda: krx.get_naver_financials(code)) or {}
+
+    result["annual"] = nf.get("annual") or []
+    result["retention_ratio"] = nf.get("retention_ratio")
+
+    # 부채비율: 기존 값이 없거나 0이면 네이버 값으로 보완.
+    if nf.get("debt_ratio") is not None and not result.get("debt_ratio"):
+        result["debt_ratio"] = nf["debt_ratio"]
+    return result
 
 
 @api_bp.route("/analyze/<code>/chart")
@@ -240,6 +349,22 @@ def analyze_recommendation(code):
             "chart": bool(chart),
             "news": bool(news),
         }
+
+        # 확장(하위호환): confidence·factors·dimensions + 목표가/손절/현재가.
+        try:
+            result = recommendation_engine.extend(result, financial, chart, news, fs, cs, ns)
+        except Exception:
+            pass
+        try:
+            df = krx.get_ohlcv(code)
+            if df is not None and not df.empty:
+                current_price = int(df["close"].iloc[-1])
+                pt = price_target_calculator.suggest(current_price)
+                result["current_price"] = current_price
+                result["target_price"] = pt.get("target_price")
+                result["stop_loss"] = pt.get("stop_loss")
+        except Exception:
+            pass
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -261,6 +386,18 @@ def analyze_price_target(code):
         result = price_target_calculator.suggest(current_price, expected_return, max_loss)
         result["code"] = code
         result["as_of"] = str(df["date"].iloc[-1])[:10]
+
+        # 확장(하위호환): upside·피벗 지지/저항·시나리오. 실패해도 기존 응답 유지.
+        try:
+            last = df.iloc[-1]
+            result = price_target_calculator.extend(
+                result,
+                high=float(last["high"]),
+                low=float(last["low"]),
+                close=float(last["close"]),
+            )
+        except Exception:
+            price_target_calculator.extend(result)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

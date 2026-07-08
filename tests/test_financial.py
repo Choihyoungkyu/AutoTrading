@@ -10,14 +10,8 @@ def mock_krx():
 
 
 @pytest.fixture
-def mock_yf():
-    yf = MagicMock()
-    return yf
-
-
-@pytest.fixture
-def analyzer(mock_krx, mock_yf):
-    return FinancialAnalyzer(mock_krx, mock_yf)
+def analyzer(mock_krx):
+    return FinancialAnalyzer(mock_krx)
 
 
 def test_verdict_undervalued(analyzer, mock_krx):
@@ -105,7 +99,7 @@ def test_analyze_response_keys(analyzer, mock_krx):
         assert "verdict" in result
 
 
-def test_analyze_endpoint(mock_krx, mock_yf):
+def test_analyze_endpoint():
     from main import create_app
 
     app = create_app()

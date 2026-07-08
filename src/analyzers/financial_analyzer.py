@@ -1,12 +1,10 @@
 from concurrent.futures import ThreadPoolExecutor
 from src.collectors.krx_collector import KRXCollector
-from src.collectors.yfinance_collector import YFinanceCollector
 
 
 class FinancialAnalyzer:
-    def __init__(self, krx_collector: KRXCollector, yfinance_collector: YFinanceCollector = None):
+    def __init__(self, krx_collector: KRXCollector):
         self.krx = krx_collector
-        self.yf = yfinance_collector or YFinanceCollector()
 
     def get_financial_metrics(self, code: str, date: str = None) -> dict:
         metrics = self.krx.get_market_cap(code, date)
@@ -17,14 +15,8 @@ class FinancialAnalyzer:
         bps = metrics.get("bps", 0)
         roe = (eps / bps * 100) if bps > 0 else 0
 
+        # 부채비율은 네이버 '기업실적분석'에서 보완한다(routes._extend_financial).
         debt_ratio = 0
-        try:
-            import yfinance
-            ticker = yfinance.Ticker(f"{code}.KS")
-            debt_to_equity = ticker.info.get("debtToEquity", 0)
-            debt_ratio = float(debt_to_equity) if debt_to_equity else 0
-        except Exception:
-            pass
 
         return {
             "per": metrics.get("per", 0),
@@ -38,8 +30,7 @@ class FinancialAnalyzer:
         }
 
     def _peer_metrics(self, code: str) -> dict:
-        # 업종 평균 계산용 경량 지표. 개별 종목 상세와 달리 yfinance(부채비율)를
-        # 호출하지 않아 peer 수가 많아도 빠르다. ROE는 EPS/BPS로 계산.
+        # 업종 평균 계산용 경량 지표. peer 수가 많아도 빠르다. ROE는 EPS/BPS로 계산.
         try:
             m = self.krx.get_market_cap(code)
         except Exception:

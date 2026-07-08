@@ -5,6 +5,12 @@ import zoomPlugin from 'chartjs-plugin-zoom'
 import Hammer from 'hammerjs'
 import { api } from '../api/client.js'
 import { currentCode, currentName } from '../composables/useCurrentStock.js'
+import { theme } from '../composables/useTheme.js'
+
+// Chart.js는 CSS 변수를 직접 못 읽으므로 현재 테마의 토큰값을 읽어와 축/범례 색에 사용
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 // 터치 핀치 줌을 위해 Hammer를 전역에 노출(chartjs-plugin-zoom이 참조)
 if (typeof window !== 'undefined' && !window.Hammer) window.Hammer = Hammer
@@ -17,11 +23,13 @@ const INTERVALS = [
   { key: 'year', label: '연도별' },
 ]
 
+// 차트 라인 색은 양쪽 테마(다크/라이트)에서 모두 보이는 고정 팔레트 사용
+const CLOSE_COLOR = '#3B82F6'   // 종가 주선 (secondary 파랑)
 const INDICATORS = [
-  { key: 'ma5', label: 'MA5', color: '#e74c3c', tooltip: '최근 5일 평균가격. 가장 빠른 단기 추세 변화를 나타냄' },
-  { key: 'ma20', label: 'MA20', color: '#f39c12', tooltip: '최근 20일 평균가격. 단기 추세와 매매신호를 나타냄' },
-  { key: 'ma60', label: 'MA60', color: '#2980b9', tooltip: '최근 60일 평균가격. 중기 추세의 흐름을 나타냄' },
-  { key: 'bb', label: '볼린저밴드', color: '#9b59b6', tooltip: '이동평균을 중심으로 표준편차 범위의 밴드. 가격 변동성과 과매수/과매도를 나타냄' },
+  { key: 'ma5', label: 'MA5', color: '#F59E0B', tooltip: '최근 5일 평균가격. 가장 빠른 단기 추세 변화를 나타냄' },
+  { key: 'ma20', label: 'MA20', color: '#A78BFA', tooltip: '최근 20일 평균가격. 단기 추세와 매매신호를 나타냄' },
+  { key: 'ma60', label: 'MA60', color: '#34D399', tooltip: '최근 60일 평균가격. 중기 추세의 흐름을 나타냄' },
+  { key: 'bb', label: '볼린저밴드', color: '#94A3B8', tooltip: '이동평균을 중심으로 표준편차 범위의 밴드. 가격 변동성과 과매수/과매도를 나타냄' },
 ]
 
 // 초기 화면에 보여줄 최근 거래일 수(축소하면 과거 전체까지 표시)
@@ -40,8 +48,8 @@ let savedWindow = null   // 지표 토글 시 확대/이동 상태 보존용 {mi
 
 function indStyle(ind) {
   return active[ind.key]
-    ? { borderColor: ind.color, background: ind.color, color: 'white' }
-    : { borderColor: ind.color, background: 'white', color: ind.color }
+    ? { borderColor: ind.color, background: ind.color, color: '#fff' }
+    : { borderColor: ind.color, background: 'transparent', color: ind.color }
 }
 
 function toggleIndicator(key) {
@@ -57,12 +65,12 @@ function buildDatasets() {
   const datasets = [{
     label: '종가',
     data: rows.map((d) => d.close),
-    borderColor: '#2c3e50',
+    borderColor: CLOSE_COLOR,
     backgroundColor: (() => {
       const ctx = canvas.value.getContext('2d')
       const gradient = ctx.createLinearGradient(0, 0, 0, 320)
-      gradient.addColorStop(0, 'rgba(44,62,80,0.25)')
-      gradient.addColorStop(1, 'rgba(44,62,80,0)')
+      gradient.addColorStop(0, 'rgba(59,130,246,0.20)')
+      gradient.addColorStop(1, 'rgba(59,130,246,0)')
       return gradient
     })(),
     borderWidth: 2,
@@ -81,14 +89,14 @@ function buildDatasets() {
     tension: 0.1,
   })
 
-  if (active.ma5) datasets.push(lineMA('ma5', 'MA5', '#e74c3c'))
-  if (active.ma20) datasets.push(lineMA('ma20', 'MA20', '#f39c12'))
-  if (active.ma60) datasets.push(lineMA('ma60', 'MA60', '#2980b9'))
+  if (active.ma5) datasets.push(lineMA('ma5', 'MA5', '#F59E0B'))
+  if (active.ma20) datasets.push(lineMA('ma20', 'MA20', '#A78BFA'))
+  if (active.ma60) datasets.push(lineMA('ma60', 'MA60', '#34D399'))
   if (active.bb) {
     datasets.push({
       label: 'BB Upper',
       data: rows.map((d) => d.bb_upper),
-      borderColor: '#9b59b6',
+      borderColor: '#94A3B8',
       borderWidth: 1.5,
       borderDash: [4, 4],
       pointRadius: 0,
@@ -98,12 +106,12 @@ function buildDatasets() {
     datasets.push({
       label: 'BB Lower',
       data: rows.map((d) => d.bb_lower),
-      borderColor: '#9b59b6',
+      borderColor: '#94A3B8',
       borderWidth: 1.5,
       borderDash: [4, 4],
       pointRadius: 0,
       fill: '-1',
-      backgroundColor: 'rgba(155,89,182,0.1)',
+      backgroundColor: 'rgba(148,163,184,0.10)',
       tension: 0.1,
     })
   }
@@ -126,6 +134,9 @@ function renderChart() {
 
   // savedWindow(지표 토글 시 설정)가 있으면 그 범위를, 없으면 최근 구간을 표시
   if (chartInstance) chartInstance.destroy()
+  const tickColor = cssVar('--mut')
+  const gridColor = cssVar('--grid')
+  const legendColor = cssVar('--tx')
   chartInstance = new Chart(canvas.value.getContext('2d'), {
     type: 'line',
     data: { labels, datasets: buildDatasets() },
@@ -135,7 +146,7 @@ function renderChart() {
       animation: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: true },
+        legend: { display: true, labels: { color: legendColor, font: { size: 11 } } },
         tooltip: {
           callbacks: {
             label: (ctx) =>
@@ -175,11 +186,12 @@ function renderChart() {
       },
       scales: {
         x: {
-          ticks: { maxTicksLimit: 8, maxRotation: 0, font: { size: 11 } },
+          ticks: { maxTicksLimit: 8, maxRotation: 0, font: { size: 11 }, color: tickColor },
           grid: { display: false },
         },
         y: {
-          ticks: { callback: (v) => '₩' + v.toLocaleString(), font: { size: 11 } },
+          ticks: { callback: (v) => '₩' + v.toLocaleString(), font: { size: 11 }, color: tickColor },
+          grid: { color: gridColor },
         },
       },
     },
@@ -212,6 +224,12 @@ async function loadPriceChart() {
 onMounted(loadPriceChart)
 // 종목 변경 시 재조회
 watch(currentCode, loadPriceChart)
+// 테마 전환 시 축·범례 색을 갱신(현재 확대/이동 상태 유지)
+watch(theme, () => {
+  if (!chartData) return
+  if (chartInstance) savedWindow = { min: chartInstance.scales.x.min, max: chartInstance.scales.x.max }
+  renderChart()
+})
 onBeforeUnmount(() => {
   if (chartInstance) chartInstance.destroy()
 })
@@ -245,7 +263,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <div class="chart-hint">💡 마우스 휠(또는 핀치)로 확대·축소, 드래그로 기간 이동</div>
-    <div style="font-size:12px;color:#7f8c8d;margin-top:4px;">
+    <div style="font-size:12px;color:var(--mut);margin-top:4px;">
       {{ asof }}
       <span v-if="latestRate != null" :class="latestRate > 0 ? 'value-up' : 'value-down'" style="font-weight:600;">
         · 등락률 {{ latestRate > 0 ? '+' : '' }}{{ latestRate.toFixed(2) }}%

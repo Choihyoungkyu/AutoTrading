@@ -15,7 +15,6 @@ class NewsCollector:
     """종목 뉴스를 여러 소스에서 모아 정규화한다.
 
     국내(6자리 코드): 네이버 금융 모바일 뉴스 API + 구글 뉴스.
-    해외(티커): yfinance 뉴스 + 구글 뉴스.
     최근 N일 필터 + 제목 유사도 기반 중복 제거 후 최신순 반환.
     """
 
@@ -23,17 +22,10 @@ class NewsCollector:
         self.krx = krx_collector or KRXCollector()
 
     def get_news(self, code: str, days: int = 5, limit: int = 15) -> list:
-        domestic = code.isdigit() and len(code) == 6
-
-        items = []
-        if domestic:
-            items += self._from_naver(code)
-            query = self.krx.get_name(code)
-        else:
-            items += self._from_yfinance(code)
-            query = code
-        # 원본 매체(네이버/yfinance)를 먼저 넣어 dedupe 시 우선 보존한다.
-        items += self._from_google(query, domestic)
+        items = self._from_naver(code)
+        query = self.krx.get_name(code)
+        # 원본 매체(네이버)를 먼저 넣어 dedupe 시 우선 보존한다.
+        items += self._from_google(query, domestic=True)
 
         items = self._within_days(items, days)
         items = self._dedupe(items)
@@ -66,28 +58,6 @@ class NewsCollector:
                     "summary": html.unescape(it.get("body", "")),
                     "published": published,
                 })
-        return out
-
-    def _from_yfinance(self, symbol: str) -> list:
-        try:
-            import yfinance
-            raw = yfinance.Ticker(symbol).news or []
-        except Exception:
-            return []
-
-        out = []
-        for it in raw:
-            ts = it.get("providerPublishTime")
-            title = it.get("title")
-            if not title or not ts:
-                continue
-            out.append({
-                "title": title,
-                "url": it.get("link", ""),
-                "source": it.get("publisher", "yfinance"),
-                "summary": it.get("summary", ""),
-                "published": self._naive(datetime.fromtimestamp(ts)),
-            })
         return out
 
     def _from_google(self, query: str, domestic: bool) -> list:
@@ -164,7 +134,7 @@ class NewsCollector:
 
     @staticmethod
     def _naive(dt: datetime) -> datetime:
-        # tz-aware(구글/yfinance)를 로컬 naive로 통일해 정렬·비교 오류를 막는다.
+        # tz-aware(구글)를 로컬 naive로 통일해 정렬·비교 오류를 막는다.
         if dt.tzinfo is not None:
             dt = dt.astimezone().replace(tzinfo=None)
         return dt
