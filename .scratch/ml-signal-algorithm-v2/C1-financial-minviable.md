@@ -28,3 +28,11 @@ size: M
 ## Blocked by
 
 - D3 (D→C 게이트 GO)
+
+## 완료 (2026-07-08) — 결과: 엣지 없음
+
+- 신규: `src/ml/fundamentals.py`(`join_fundamentals_asof`, merge_asof backward로 공시 시차 엄수),
+  `tests/test_ml_fundamentals.py`(누수 회귀 포함 3 테스트), `.scratch/ml-signal-algorithm/run_c1_financial.py`
+- 재무 피처 4개(fund_per/pbr/div/earnings_yield)를 D 대형주에 추가한 A/B.
+- 실측: 합집합 93종목·33,735행, **기준선 초과 0/4**, 폴드간 Sharpe -0.77, 성공=False.
+- 판정: 재무 추가로도 대형주 엣지 없음. C3에서 종합.

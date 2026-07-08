@@ -28,6 +28,22 @@ class UniverseSelector:
         codes = ranked.index[:top_n]
         return [str(code).zfill(6) for code in codes]
 
+    def get_universe_band(self, as_of: str, start_rank: int, end_rank: int,
+                          market: str = "KOSPI", min_value=None) -> list[str]:
+        """as_of 그 시점 데이터만으로 거래대금 내림차순 [start_rank, end_rank) 밴드 반환.
+
+        0-기반 순위. min_value가 주어지면 거래대금 < min_value 종목을 밴드 슬라이스
+        전에 제외한다(극저유동성·슬리피지 방지). get_universe와 동일한 point-in-time.
+        """
+        df = self._fetch_ohlcv_by_ticker(as_of, market)
+        if df is None or df.empty or "거래대금" not in df.columns:
+            return []
+        ranked = df.sort_values("거래대금", ascending=False)
+        if min_value is not None:
+            ranked = ranked[ranked["거래대금"] >= min_value]
+        codes = ranked.index[start_rank:end_rank]
+        return [str(code).zfill(6) for code in codes]
+
     def _fetch_ohlcv_by_ticker(self, as_of: str, market: str):
         # 해당일 전 종목 OHLCV+거래대금(종목코드 인덱스). 실패 시 None.
         try:

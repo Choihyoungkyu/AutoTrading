@@ -3,6 +3,14 @@
 설계 문서: `docs/superpowers/specs/2026-07-08-ml-signal-v2-design.md`
 원칙: **돈 벌 근거가 없으면 정직하게 멈춘다.** 단계 간 하드 게이트.
 
+## 현재 상태 (2026-07-08): Phase C에서 **STOP**
+
+- **D 완료** (D1·D2·D3, master 병합) → D→C 게이트 **GO**.
+- **C 완료** (C1 재무·C2 중소형주) → 라우팅 게이트 **STOP**: 둘 다 기준선 초과 0/4.
+- **B·A 동결**(needs-triage 유지, 승격 안 함). 세 방향(D 차트·C1 재무·C2 중소형) 모두
+  엣지 없음이 정직한 v2 결론. 다음은 "문제 설정 변경 여부" — 인간 판단.
+- 판정 문서: `docs/ml-signal-v2-d3-gate.md`(GO), `docs/ml-signal-v2-c3-gate.md`(STOP).
+
 ## 로드맵 (D → C → B → A)
 
 ```

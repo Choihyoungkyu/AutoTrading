@@ -28,3 +28,11 @@ size: S
 ## Blocked by
 
 - D3 (D→C 게이트 GO)
+
+## 완료 (2026-07-08) — 결과: 엣지 없음
+
+- 신규: `UniverseSelector.get_universe_band`(랭크 밴드 point-in-time 선정),
+  `tests/test_ml_universe_band.py`(9 테스트), `.scratch/ml-signal-algorithm/run_c2_smallcap.py`
+- 차트 16피처 그대로, 유니버스만 KOSPI 100~140위 밴드(min_value 5억)로 교체한 A/B.
+- 실측: 합집합 176종목·56,317행, **기준선 초과 0/4**, 폴드간 Sharpe -0.82, 성공=False.
+- 판정: 중소형주로 바꿔도 차트 엣지 없음("대형주 효율성" 가설 기각). C3에서 종합.
