@@ -13,6 +13,7 @@ from src.collectors.news_collector import NewsCollector
 from src.analyzers.news_analyzer import NewsAnalyzer
 from src.analyzers.recommendation_engine import RecommendationEngine
 from src.analyzers.price_target_calculator import PriceTargetCalculator
+from src.analyzers.stock_explainer import explain
 
 api_bp = Blueprint("api", __name__)
 krx = KRXCollector()
@@ -300,6 +301,30 @@ def analyze_chart(code):
         result = chart_analyzer.analyze(code)
         if not result:
             return jsonify({"error": "No data found for code: " + code}), 404
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/analyze/<code>/explain")
+def analyze_explain(code):
+    # 현재 상태 서술 + 리스크. 예측 아님(chart의 signal/confidence는 쓰지 않음).
+    try:
+        chart = chart_analyzer.analyze(code)
+        if not chart:
+            return jsonify({"error": "No data found for code: " + code}), 404
+        fin = financial_analyzer.get_financial_metrics(code) or {}
+        macd = chart.get("macd") or {}
+        indicators = {
+            "rsi": chart.get("rsi"),
+            "macd_line": macd.get("line"),
+            "macd_signal": macd.get("signal"),
+            "ma_20": chart.get("ma_20"),
+            "ma_50": chart.get("ma_50"),
+        }
+        result = explain(indicators, fin)
+        result["code"] = code
+        result["as_of"] = chart.get("as_of")
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
