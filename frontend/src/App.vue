@@ -12,6 +12,7 @@ import ChartAnalysis from './components/ChartAnalysis.vue'
 import NewsAnalysis from './components/NewsAnalysis.vue'
 import RecommendationAnalysis from './components/RecommendationAnalysis.vue'
 import PriceTargetCard from './components/PriceTargetCard.vue'
+import StockExplainer from './components/StockExplainer.vue'
 import AppFooter from './components/AppFooter.vue'
 import StockSearch from './components/StockSearch.vue'
 import { currentCode, currentName, goHome } from './composables/useCurrentStock.js'
@@ -25,6 +26,7 @@ const tabs = [
   { key: 'news', label: '📰 뉴스' },
   { key: 'price-target', label: '🎚️ 목표가·손절' },
   { key: 'recommendation', label: '🎯 종합 추천' },
+  { key: 'explain', label: '🧭 상태 설명' },
 ]
 const active = ref('overview')
 
@@ -148,6 +150,7 @@ onBeforeUnmount(() => clearInterval(timer))
               <FinancialAnalysis v-else-if="active === 'financial'" key="financial" />
               <ChartAnalysis v-else-if="active === 'technical'" key="technical" />
               <NewsAnalysis v-else-if="active === 'news'" key="news" />
+              <StockExplainer v-else-if="active === 'explain'" key="explain" />
             </keep-alive>
 
             <AppFooter />
